@@ -1,0 +1,439 @@
+""" ae.paths unit tests """
+import pytest
+
+import os
+import shutil
+import sys
+from ae.system import app_name_guess, sys_platform
+from ae.paths import app_data_path, app_docs_path, move_path, path_files, user_data_path, user_docs_path, Collector
+
+
+class TestAppPaths:
+    def test_app_data_path(self):
+        assert app_data_path()
+        assert app_data_path().endswith(app_name_guess())
+        assert app_data_path().startswith(user_data_path())
+
+    def test_app_docs_path(self):
+        assert app_docs_path()
+        assert app_docs_path().endswith(app_name_guess())
+        assert app_docs_path().startswith(user_docs_path())
+
+
+class TestUserDataPath:
+    def test_user_data_path_android(self):
+        if sys_platform() != 'android':
+            pytest.skip("android-only test")
+        try:
+            os.environ['ANDROID_ARGUMENT'] = 'tst'
+            assert user_data_path() == 'android'
+        finally:
+            os.environ.pop('ANDROID_ARGUMENT', None)
+
+        try:
+            os.environ['KIVY_BUILD'] = 'android'
+            assert user_data_path() == 'android'
+        finally:
+            os.environ.pop('KIVY_BUILD', None)
+
+    def test_user_data_path_cygwin(self):
+        test_root = '/test_path'
+        old_platform = sys.platform
+        old_env = os.environ.get('APPDATA')
+        try:
+            sys.platform = 'cygwin'
+            os.environ['APPDATA'] = test_root
+            assert user_data_path() == test_root
+        finally:
+            if old_env:
+                os.environ['APPDATA'] = old_env
+            else:
+                os.environ.pop('APPDATA', None)
+            sys.platform = old_platform
+
+    def test_user_data_path_darwin(self):
+        old_platform = sys.platform
+        try:
+            sys.platform = 'darwin'
+            assert user_data_path() == os.path.expanduser(os.path.join('~', 'Library', 'Application Support'))
+        finally:
+            sys.platform = old_platform
+
+    def test_user_data_path_ios(self):
+        old_platform = sys.platform
+        try:
+            sys.platform = 'ios'
+            assert user_data_path() == os.path.expanduser(os.path.join('~', 'Documents'))
+        finally:
+            sys.platform = old_platform
+
+    def test_user_data_path_linux(self):  # or _freebsd or any other os
+        test_path = '.config'
+        old_platform = sys.platform
+        old_env = os.environ.get('XDG_CONFIG_HOME')
+        try:
+            sys.platform = 'linux'
+            os.environ['XDG_CONFIG_HOME'] = test_path
+            assert user_data_path().endswith(test_path)
+
+            os.environ['XDG_CONFIG_HOME'] = ""
+            assert user_data_path().endswith(test_path)
+
+            sys.platform = 'freebsd'
+            os.environ['XDG_CONFIG_HOME'] = test_path
+            assert user_data_path().endswith(test_path)
+
+            os.environ['XDG_CONFIG_HOME'] = ""
+            assert user_data_path().endswith(test_path)
+        finally:
+            if old_env:
+                os.environ['XDG_CONFIG_HOME'] = old_env
+            else:
+                os.environ.pop('XDG_CONFIG_HOME', None)
+            sys.platform = old_platform
+
+    def test_user_data_path_win32(self):
+        test_root = '/test_path'
+        old_platform = sys.platform
+        old_env = os.environ.get('APPDATA')
+        try:
+            sys.platform = 'win32'
+            os.environ['APPDATA'] = test_root
+            assert user_data_path() == test_root
+        finally:
+            if old_env:
+                os.environ['APPDATA'] = old_env
+            else:
+                os.environ.pop('APPDATA', None)
+            sys.platform = old_platform
+
+
+class TestUserDocsPath:
+    def test_user_docs_path_android(self):
+        if sys_platform() != 'android':
+            pytest.skip("android-only test")
+        try:
+            os.environ['ANDROID_ARGUMENT'] = 'tst'
+            assert user_docs_path() == 'android'
+        finally:
+            os.environ.pop('ANDROID_ARGUMENT', None)
+
+        try:
+            os.environ['KIVY_BUILD'] = 'android'
+            assert user_docs_path() == 'android'
+        finally:
+            os.environ.pop('KIVY_BUILD', None)
+
+    def test_user_docs_path_cygwin(self):
+        test_root = '/test_path'
+        old_platform = sys.platform
+        old_env = os.environ.get('USERPROFILE')
+        try:
+            sys.platform = 'cygwin'
+            os.environ['USERPROFILE'] = test_root
+            assert user_docs_path() == test_root + '/Documents'
+        finally:
+            if old_env:
+                os.environ['USERPROFILE'] = old_env
+            else:
+                os.environ.pop('USERPROFILE', None)
+            sys.platform = old_platform
+
+    def test_user_docs_path_darwin(self):
+        old_platform = sys.platform
+        try:
+            sys.platform = 'darwin'
+            assert user_docs_path() == os.path.expanduser(os.path.join('~', 'Documents'))
+        finally:
+            sys.platform = old_platform
+
+    def test_user_docs_path_ios(self):
+        old_platform = sys.platform
+        try:
+            sys.platform = 'ios'
+            assert user_docs_path() == os.path.expanduser(os.path.join('~', 'Documents'))
+        finally:
+            sys.platform = old_platform
+
+    def test_user_docs_path_linux(self):  # or _freebsd or any other os
+        test_path = 'Documents'
+        old_platform = sys.platform
+        try:
+            sys.platform = 'linux'
+            assert user_docs_path().endswith(test_path)
+
+            sys.platform = 'freebsd'
+            assert user_docs_path().endswith(test_path)
+        finally:
+            sys.platform = old_platform
+
+    def test_user_docs_path_win32(self):
+        test_root = '/test_path'
+        old_platform = sys.platform
+        old_env = os.environ.get('USERPROFILE')
+        try:
+            sys.platform = 'win32'
+            os.environ['USERPROFILE'] = test_root
+            assert user_docs_path() == test_root + '/Documents'
+        finally:
+            if old_env:
+                os.environ['USERPROFILE'] = old_env
+            else:
+                os.environ.pop('USERPROFILE', None)
+            sys.platform = old_platform
+
+
+FILE0 = 'app.ini'
+CONTENT0 = "TEST FILE0 CONTENT"
+OLD_CONTENT0 = "OLD/LOCKED FILE0 CONTENT"
+
+DIR1 = 'app_dir'
+FILE1 = 'app.png'
+CONTENT1 = "TEST FILE1 CONTENT"
+
+MOVES_SRC_FOLDER_NAME = 'tst_move_path_source'
+OVERWRITES_SRC_FOLDER_NAME = 'tst_move_path_destination'
+
+
+@pytest.fixture(params=[MOVES_SRC_FOLDER_NAME, OVERWRITES_SRC_FOLDER_NAME])
+def files_to_move(request, tmpdir):
+    """ create test files in source directory for to be moved and/or overwritten. """
+    src_dir = tmpdir.mkdir(request.param)
+
+    src_file1 = src_dir.join(FILE0)
+    src_file1.write(CONTENT0)
+    src_sub_dir = src_dir.mkdir(DIR1)
+    src_file2 = src_sub_dir.join(FILE1)
+    src_file2.write(CONTENT1)
+
+    yield str(src_file1), str(src_file2)
+
+    # tmpdir/dst_dir1 will be removed automatically by pytest - leaving the last three temporary directories
+    # .. see https://docs.pytest.org/en/latest/tmpdir.html#the-default-base-temporary-directory
+    # shutil.rmtree(tmpdir)
+
+
+def _create_file_at_destination(dst_folder):
+    """ create file0 at destination folder for to block move. """
+    dst_file = os.path.join(dst_folder, FILE0)
+    with open(dst_file, 'w') as fp:
+        fp.write(OLD_CONTENT0)
+    return dst_file
+
+
+def _file_content(fn):
+    with open(fn) as fp:
+        fc = fp.read()
+    return fc
+
+
+class TestMovePath:
+    def test_moves_to_parent_dir(self, files_to_move):
+        src_dir = os.path.dirname(files_to_move[0])
+        dst_dir = os.path.join(src_dir, '..')
+        for src_file_path in files_to_move:
+            assert os.path.exists(src_file_path)
+            assert not os.path.exists(os.path.join(dst_dir, os.path.relpath(src_file_path, src_dir)))
+
+        move_path(src_folder=src_dir, dst_folder=dst_dir)
+
+        if MOVES_SRC_FOLDER_NAME in src_dir:
+            for src_file_path in files_to_move:
+                assert not os.path.exists(src_file_path)
+                assert os.path.exists(os.path.join(dst_dir, os.path.relpath(src_file_path, src_dir)))
+
+    def test_blocked_moves_to_parent_dir(self, files_to_move):
+        src_dir = os.path.dirname(files_to_move[0])
+        dst_dir = os.path.join(src_dir, '..')
+        dst_block_file = _create_file_at_destination(dst_dir)
+        assert os.path.exists(dst_block_file)
+        for src_file_path in files_to_move:
+            assert os.path.exists(src_file_path)
+            dst_file = os.path.join(dst_dir, os.path.relpath(src_file_path, src_dir))
+            assert dst_file == dst_block_file or not os.path.exists(dst_file)
+
+        move_path(src_folder=src_dir, dst_folder=dst_dir)
+
+        if MOVES_SRC_FOLDER_NAME in src_dir:
+            assert os.path.exists(files_to_move[0])
+            assert _file_content(files_to_move[0]) == CONTENT0
+            dst_file = os.path.join(dst_dir, os.path.relpath(files_to_move[0], src_dir))
+            assert os.path.exists(dst_file)
+            assert _file_content(dst_file) == OLD_CONTENT0
+
+            assert not os.path.exists(files_to_move[1])
+            dst_file = os.path.join(dst_dir, os.path.relpath(files_to_move[1], src_dir))
+            assert os.path.exists(dst_file)
+            assert _file_content(dst_file) == CONTENT1
+
+    def test_overwrites_to_parent_dir(self, files_to_move):
+        src_dir = os.path.dirname(files_to_move[0])
+        dst_dir = os.path.join(src_dir, '..')
+        for src_file_path in files_to_move:
+            assert os.path.exists(src_file_path)
+            assert not os.path.exists(os.path.join(dst_dir, os.path.relpath(src_file_path, src_dir)))
+
+        move_path(src_folder=src_dir, dst_folder=dst_dir, overwrite=True)
+
+        if OVERWRITES_SRC_FOLDER_NAME in src_dir:
+            for src_file_path in files_to_move:
+                assert not os.path.exists(src_file_path)
+                assert os.path.exists(os.path.join(dst_dir, os.path.relpath(src_file_path, src_dir)))
+
+    def test_unblocked_overwrites_to_parent_dir(self, files_to_move):
+        src_dir = os.path.dirname(files_to_move[0])
+        dst_dir = os.path.join(src_dir, '..')
+        dst_block_file = _create_file_at_destination(dst_dir)
+        assert os.path.exists(dst_block_file)
+        for src_file_path in files_to_move:
+            assert os.path.exists(src_file_path)
+            dst_file = os.path.join(dst_dir, os.path.relpath(src_file_path, src_dir))
+            assert dst_file == dst_block_file or not os.path.exists(dst_file)
+
+        move_path(src_folder=src_dir, dst_folder=dst_dir, overwrite=True)
+
+        if OVERWRITES_SRC_FOLDER_NAME in src_dir:
+            assert not os.path.exists(files_to_move[0])
+            dst_file = os.path.join(dst_dir, os.path.relpath(files_to_move[0], src_dir))
+            assert os.path.exists(dst_file)
+            assert _file_content(dst_file) == CONTENT0
+
+            assert not os.path.exists(files_to_move[1])
+            dst_file = os.path.join(dst_dir, os.path.relpath(files_to_move[1], src_dir))
+            assert os.path.exists(dst_file)
+            assert _file_content(dst_file) == CONTENT1
+
+    def test_file_moves_to_user_dir_via_check_all(self, files_to_move):
+        src_dir = os.path.dirname(files_to_move[0])
+        dst_dir = user_data_path()
+
+        moved = list()
+        try:
+            moved += move_path(src_dir, "")
+
+            for src_file_path in files_to_move:
+                assert not os.path.exists(src_file_path)
+                assert os.path.exists(os.path.join(dst_dir, os.path.relpath(src_file_path, src_dir)))
+        finally:
+            for dst_file_path in moved:
+                dst_path = os.path.relpath(dst_file_path, dst_dir)
+                if os.path.exists(dst_file_path):
+                    os.remove(dst_file_path)
+                    if dst_path != os.path.basename(dst_file_path):
+                        shutil.rmtree(os.path.dirname(dst_file_path))
+
+
+class TestPathFiles:
+    def test_path_files(self):
+        assert path_files('.')
+        assert path_files('ae')
+        assert path_files('tests')
+        assert len(path_files('**/*.py')) == 4
+        assert path_files('**/*.py') == ['setup.py', 'ae/paths.py', 'tests/test_paths.py', 'tests/conftest.py']
+
+    def test_path_files_placeholders(self):
+        assert len(path_files('.')) == len(path_files('{cwd}'))
+        assert path_files('**.py') == ['setup.py']
+        assert len(path_files('{cwd}/**/*.py')) == 4
+
+    def test_path_files_wildcards(self):
+        assert path_files('**/pat?s.py') == ['ae/paths.py']
+        assert len(path_files('{cwd}/**/*paths.py')) == 2
+        assert len(path_files('{cwd}/**/*paths.?y')) == 2
+
+    def test_path_file_class(self):
+        def add_file(file_name, **kwargs):
+            """ callable used for the file_class argument of path_files. """
+            added.append((file_name, kwargs))
+            return file_name
+        added = list()
+        found = path_files('**.py', file_class=add_file, a=1, b=2)
+        assert len(found) == len(added)
+        assert found[0] == added[0][0]
+        assert added[0][1] == dict(a=1, b=2)
+
+
+class TestCollector:
+    def test_collect_placeholder(self):
+        coll = Collector(app="tst_app_path", app_name="tst_app_name")
+        assert 'app' in coll.placeholders
+        assert coll.placeholders['app_name'] == "tst_app_name"
+
+    def test_collect_nothing_found(self):
+        coll = Collector(app="tst_app_path", app_name="tst_app_name")
+        prefixes = ('{cwd}/../..', '{app}', '{usr}', '{usr}/{app_name}', '{cwd}/..', '{cwd}', )
+        coll.collect(*prefixes, append=('.app_env.cfg', '.sys_env.cfg', '.sys_envTEST.cfg',))
+        assert not coll.paths
+        assert not coll.files
+        assert not coll.selected
+        assert coll.failed == 0
+        assert len(coll.prefix_failed) == len(prefixes)
+        assert any(count == 0 for count in coll.prefix_failed.values())
+        assert len(coll.suffix_failed) == 0
+
+    def test_collect_appends(self):
+        coll = Collector(app="ae", tst='tests', app_name=__file__)
+        coll.collect('{app}', "ae", '', append=('{app_name}', 'paths.py', "", "ae"), only_first_of=())
+        assert coll.paths
+        assert coll.files
+        assert not coll.selected
+        assert coll.failed == 0
+
+    def test_collect_appends_only_first(self):
+        coll = Collector(app="ae", tst='tests', app_name=__file__)
+        coll.collect('{app}', "ae", '', append=('{app_name}', 'paths.py', "", "ae"))
+        assert not coll.paths
+        assert coll.files
+        assert not coll.selected
+        assert coll.failed == 0
+
+    def test_collect_append_string(self):
+        coll = Collector(app="ae", tst='tests', app_name=__file__)
+        coll.collect('{app}', "ae", '', append='{app_name}')
+        assert not coll.paths
+        assert coll.files
+        assert not coll.selected
+        assert coll.failed == 0
+
+    def test_collect_selects(self):
+        coll = Collector(app="ae", tst='tests', app_name="tst_app_name")
+        coll.collect('{cwd}', '{app}', "ae",
+                     select=(".*", "README.md", "tests/test_paths.py", "", "ae", ), only_first_of=())
+        assert coll.paths
+        assert coll.files
+        assert coll.selected
+        assert 0 < coll.failed < len(coll.paths) + len(coll.files)
+
+    def test_collect_select_only_first(self):
+        coll = Collector(app="ae", tst='tests', app_name="tst_app_name")
+        coll.collect('{cwd}', '{app}', "ae",
+                     select=".*")
+        assert not coll.paths
+        assert coll.files
+        assert coll.selected
+        assert coll.failed == 0
+
+    def test_collect_select_string(self):
+        coll = Collector(app="ae", tst='tests', app_name="tst_app_name")
+        coll.collect('{cwd}', '{app}', "ae",
+                     select=".*", only_first_of=())
+        assert not coll.paths
+        assert coll.files
+        assert coll.selected
+        assert 0 < coll.failed < len(coll.paths) + len(coll.files)
+
+    def test_collect_prefixes_only(self):
+        coll = Collector(app="ae", tst='tests', app_name="tst_app_name")
+        coll.collect('{app}', '{usr}', "tests/test_paths.py", only_first_of=())
+        assert coll.paths
+        assert not coll.files
+        assert coll.selected
+        assert 0 < coll.failed < len(coll.paths) + len(coll.files)
+
+    def test_collect_prefixes_only_first_as_string(self):
+        coll = Collector(app="ae", tst='tests', app_name="tst_app_name")
+        coll.collect('{app}', '{usr}', "tests/test_paths.py", only_first_of="prefix")
+        assert coll.paths
+        assert not coll.files
+        assert coll.selected
+        assert coll.failed == 0
