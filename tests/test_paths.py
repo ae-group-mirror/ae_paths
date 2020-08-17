@@ -711,7 +711,7 @@ class TestCollector:
         assert coll.paths
         assert coll.files
         assert coll.selected
-        assert 0 < coll.failed < len(coll.paths) + len(coll.files)
+        assert 0 < coll.failed <= len(coll.paths) + len(coll.files)
 
     def test_collect_select_only_first(self):
         coll = Collector(app="ae", tst='tests', app_name="tst_app_name")
@@ -729,7 +729,7 @@ class TestCollector:
         assert not coll.paths
         assert coll.files
         assert coll.selected
-        assert 0 < coll.failed < len(coll.paths) + len(coll.files)
+        assert 0 < coll.failed <= len(coll.paths) + len(coll.files)
 
     def test_collect_prefixes_only(self):
         coll = Collector(app="ae", tst='tests', app_name="tst_app_name")
