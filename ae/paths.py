@@ -121,12 +121,13 @@ files and folders to the respective instance attributes::
 import glob
 import os
 import shutil
-from typing import Any, Callable, List, Tuple, Type, Union
+from typing import Any, Callable, Dict, Iterable, List, Tuple, Type, Union
+# from mypy_extensions import KwArg
 
 from ae.system import app_name_guess, env_str, sys_platform             # type: ignore
 
 
-__version__ = '0.0.1'
+__version__ = '0.0.2'
 
 
 def app_data_path() -> str:
@@ -181,42 +182,69 @@ def move_path(src_folder: str, dst_folder: str, overwrite: bool = False) -> List
     return updated
 
 
-def path_files(path_file_mask: str, recursive: bool = True, file_class: Union[Type[Any], Callable] = str,
-               **file_class_kwargs) -> List[Any]:
+def path_files(file_mask: str, recursive: bool = True,
+               # file_class: Union[Type[Any], Callable[[str, KwArg()], Any]] = str, **file_kwargs) -> List[Any]:
+               file_class: Union[Type[Any], Callable] = str, **file_kwargs) -> List[Any]:
     """ determine existing file(s) underneath the folder specified by :paramref:`~path_files.path`.
 
-    :param path_file_mask:      glob file path mask (with optional wildcards and :data:`PATH_PLACEHOLDERS`)
+    :param file_mask:           glob file mask (with optional glob wildcards and :data:`PATH_PLACEHOLDERS`)
                                 specifying the files to collect (by default including the sub-folders).
     :param recursive:           pass False to only collect the given folder (ignoring sub-folders).
-    :param file_class:          each found file will be passed as argument to this class/callable and the
-                                instance/return-value will be appended as an item to the returned list.
-                                You can pass either a file class, e.g. :class:`ae.files.CachedFile`,
-                                :class:`ae.files.CachedFile` or :class:`pathlib.Path` for each found file (def=str).
-                                Alternatively you can pass a callable which will be called on each found file.
+    :param file_class:          factory used for the returned list items (see :paramref:`path_items.creator`).
+    :param file_kwargs:         additional/optional kwargs apart from file name passed onto the used item_class.
+    :return:                    list of files of the class specified by :paramref:`path_files.item_class`.
+    """
+    return path_items(file_mask, recursive=recursive, selector=os.path.isfile, creator=file_class, **file_kwargs)
+
+
+def path_folders(folder_mask: str, recursive: bool = True,
+                 # folder_class: Union[Type[Any], Callable[[str, KwArg()], Any]] = str, **folder_kwargs) -> List[Any]:
+                 folder_class: Union[Type[Any], Callable] = str, **folder_kwargs) -> List[Any]:
+    """ determine existing folder(s) underneath the folder specified by :paramref:`~path_folders.path`.
+
+    :param folder_mask:         glob folder mask (with optional glob wildcards and :data:`PATH_PLACEHOLDERS`)
+                                specifying the folders to collect (by default including the sub-folders).
+    :param recursive:           pass False to only collect the given folder (ignoring sub-folders).
+    :param folder_class:        class or factory used for the returned list items (see :paramref:`path_items.creator`).
+    :param folder_kwargs:       additional/optional kwargs apart from file name passed onto the used item_class.
+    :return:                    list of folders of the class specified by :paramref:`path_folders.item_class`.
+    """
+    return path_items(folder_mask, recursive=recursive, selector=os.path.isdir, creator=folder_class, **folder_kwargs)
+
+
+def path_items(item_mask: str, recursive: bool = True, selector: Callable[[str], bool] = os.path.exists,
+               # creator: Union[Type[Any], Callable[[str, KwArg()], Any]] = str, **creator_kwargs) -> List[Any]:
+               creator: Union[Type[Any], Callable] = str, **creator_kwargs) -> List[Any]:
+    """ determine existing file/folder item(s) underneath the folder specified by :paramref:`~path_items.path`.
+
+    :param item_mask:           file path mask (with optional glob wildcards and :data:`PATH_PLACEHOLDERS`)
+                                specifying the files/folders to collect (by default including the sub-folders).
+    :param recursive:           pass False to only collect within the specified folder (ignoring sub-folders).
+    :param selector:            called with each found file/folder name for to check if it has to be added
+                                to the returned list.
+    :param creator:             each found file/folder will be passed as argument to this class/callable and the
+                                instance/return-value will be appended as an item to the returned item list.
+                                If not passed then the `str` class will be used, which means that the items
+                                of the returned list will be strings of the file/folder path and name.
+                                If a class, like e.g. :class:`ae.files.CachedFile`, :class:`ae.files.CachedFile`
+                                or :class:`pathlib.Path`, get passed then the items will be instances of this class.
+                                Alternatively you can pass a callable which will be called on each found file/folder.
                                 In this case the return value of the callable will be inserted in the related
                                 item of the returned list.
-
-                                .. note::
-                                    For further processing with the :class:`~ae.files.FilesRegister` class
-                                    of the :mod:`ae.files` portion: if :class:`str` is not used or the callable does
-                                    not return a string value then the object/instance has to have a `stem` attribute
-                                    holding the file name w/o file extension.
-
-    :param file_class_kwargs:   additional/optional kwargs apart from file name passed onto the used file_class.
-                                Pass e.g. an object_loader to directly open or load the file.
-    :return:                    list of files of the class specified by :paramref:`path_files.file_class`.
+    :param creator_kwargs:      additional/optional kwargs passed onto the used item_class apart from the item name.
+    :return:                    list of found and selected items of the item class (:paramref:`path_items.item_class`).
     """
-    if '{' in path_file_mask and '}' in path_file_mask:
-        path_file_mask = path_file_mask.format(**PATH_PLACEHOLDERS)
-    if recursive and '**' not in path_file_mask:
-        path_file_mask = os.path.join(path_file_mask, '**')
+    if '{' in item_mask and '}' in item_mask:
+        item_mask = item_mask.format(**PATH_PLACEHOLDERS)
+    # if recursive and '*' not in item_mask and '?' not in item_mask:
+    #    item_mask = os.path.join(item_mask, '**')
 
-    files = list()
-    for part in glob.glob(path_file_mask, recursive=recursive):
-        if os.path.isfile(part):
-            files.append(file_class(part, **file_class_kwargs))
+    items = list()
+    for part in glob.glob(item_mask, recursive=recursive):
+        if selector(part):
+            items.append(creator(part, **creator_kwargs))
 
-    return files
+    return items
 
 
 def user_data_path() -> str:
@@ -283,39 +311,44 @@ PATH_PLACEHOLDERS['app'] = app_data_path()
 PATH_PLACEHOLDERS['ado'] = app_docs_path()
 PATH_PLACEHOLDERS['cwd'] = os.getcwd()
 PATH_PLACEHOLDERS['doc'] = user_docs_path()
+PATH_PLACEHOLDERS['log'] = 'logs'
 PATH_PLACEHOLDERS['usr'] = PATH_PLACEHOLDERS['eme'] = user_data_path()
-PATH_PLACEHOLDERS['eme'] += "/{app_name}/logs/ae"
+PATH_PLACEHOLDERS['eme'] += "/{app_name}/{log}/ae"
 
 
 class Collector:
     """ file/folder collector """
-    def __init__(self, **placeholders):
-        """ create new file collector instance with individual (extended or overriding) placeholders
+    def __init__(self, path_scanner: Callable[[str], Iterable] = path_files, **placeholders):
+        """ create new file/folder/item collector instance with individual (extended or overriding) placeholders.
 
+        :param path_scanner:        callable for to determine the item type to collect. The default is the
+                                    :func:`path_files` function. Pass e.g. :func:`path_folders` for to collect
+                                    only folders or :func:`path_items` to collect both (files and folders).
         :param placeholders:        `format` kwargs where keys are the placeholders and the values the replacements.
                                     The placeholders provided by :data:`PATH_PLACEHOLDERS` are available too (but
                                     will be overwritten by these arguments).
         """
-        self.paths = list()
-        self.files = list()
-        self.selected = list()
-        self.failed = 0
-        self.prefix_failed = dict()
-        self.suffix_failed = dict()
+        self._path_scanner = path_scanner
 
-        self.placeholders = PATH_PLACEHOLDERS.copy()
+        self.paths: List[str] = list()                  #: list of found/collected folder names
+        self.files: List[str] = list()                  #: list of found/collected file names
+        self.selected: List[str] = list()               #: list of found/collected file/folder item names
+        self.failed = 0                                 #: number of not found select-combinations
+        self.prefix_failed: Dict[str, int] = dict()     #: number of not found select-combinations for each prefix
+        self.suffix_failed: Dict[str, int] = dict()     #: number of not found select-combinations for each suffix
+
+        self.placeholders = PATH_PLACEHOLDERS.copy()    #: path part placeholders of this Collector instance
         self.placeholders.update(placeholders)
 
     def check_add(self, name: str, select: bool = False) -> bool:
         """ check if name file or folder and if yes append accordingly to instance lists else do nothing.
 
-        :param name:            file/folder name, optionally including wildcards in the glob.glob format
-                                and/or placeholder(s) registered within :data:`PATH_PLACEHOLDERS`.
+        :param name:            file/folder name, optionally including wildcards in the glob.glob format.
         :param select:          pass True for to add found files/folders into :attr:`~Collector.selected`.
         :return:                True if at least one file/folder got found/added, else False.
         """
         added_any = False
-        for file_path in path_files(name) if '*' in name else (name,):
+        for file_path in self._path_scanner(name) if '*' in name or '?' in name else (name,):
             found = True
             if os.path.isdir(file_path):
                 self.paths.append(file_path)
@@ -355,7 +388,7 @@ class Collector:
         """ collect additional files/folders by combining the given prefixes with all the given append/select suffixes.
 
         :param prefixes:        tuple of file/folder paths to be used as prefix.
-        :param append:          tuple of file/folder names to be used as suffix. If a file gets
+        :param append:          tuple of file/folder names to be used as suffix.
         :param select:          tuple of file/folder names to be used as suffix.
         :param only_first_of:   tuple with the strings `'prefix'`, `'append'` or `'select'`.
                                 If it contains the string `'prefix'` then only the files/folders
@@ -369,10 +402,10 @@ class Collector:
 
         Each of the passed :paramref:`~collect.prefixes` will be combined with the suffixes
         specified in :paramref:`~collect.append` and in :paramref:`~collect.select`. The
-        resulting file paths that are exist, will then be added to the instance attributes
-        :attr:`~Collector.files` and :attr:`~Collector.paths`.
+        resulting file/folder paths that are exist, will then be added to the appropriate instance attribute,
+        either :attr:`~Collector.files` for a file or :attr:`~Collector.paths` for a folder.
 
-        Additionally the existing file paths from the combinations of
+        Additionally the existing file/folder paths from the combinations of
         :paramref:`~collect.prefixes` and :paramref:`~collect.select` will be added
         in the :attr:`~Collector.selected` list attribute.
 

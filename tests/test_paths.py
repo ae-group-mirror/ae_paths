@@ -2,10 +2,12 @@
 import pytest
 
 import os
+import pathlib
 import shutil
 import sys
 from ae.system import app_name_guess, sys_platform
-from ae.paths import app_data_path, app_docs_path, move_path, path_files, user_data_path, user_docs_path, Collector
+from ae.paths import (app_data_path, app_docs_path, move_path, path_files, path_folders, path_items,
+                      user_data_path, user_docs_path, Collector)
 
 
 class TestAppPaths:
@@ -324,33 +326,340 @@ class TestMovePath:
 
 
 class TestPathFiles:
-    def test_path_files(self):
-        assert path_files('.')
-        assert path_files('ae')
-        assert path_files('tests')
+    def test_without_placeholders_and_wildcards(self):
+        assert path_files('setup.py') == ['setup.py']
+        assert path_files('ae/paths.py') == ['ae/paths.py']
+        assert path_files('tests/test_paths.py') == ['tests/test_paths.py']
+
+        assert path_files('../ae_paths') == []
+        assert path_files('../ae_paths/setup.py') == ['../ae_paths/setup.py']
+
+        assert path_files('.') == []
+        assert all(_[0] == '.' for _ in path_files('.'))
+        assert path_files('./setup.py') == ['./setup.py']
+
+        assert path_files('ae') == []
+        assert 'ae/paths.py' not in path_files('ae')        # can also contain __pycache__/paths.cpython-36.pyc
+        assert path_files('ae/paths.py') == ['ae/paths.py']
+
+        assert path_files('tests') == []
+        assert 'tests/test_paths.py' not in path_files('tests')
+        assert path_files('tests/test_paths.py') == ['tests/test_paths.py']
+
+    def test_non_recursive(self):
+        assert path_files('setup.py', recursive=False) == ['setup.py']
+        assert path_files('ae/paths.py', recursive=False) == ['ae/paths.py']
+        assert path_files('tests/test_paths.py', recursive=False) == ['tests/test_paths.py']
+
+        assert path_files('../ae_paths', recursive=False) == []
+        assert path_files('../ae_paths/setup.py', recursive=False) == ['../ae_paths/setup.py']
+
+        assert path_files('.', recursive=False) == []
+        assert path_files('./setup.py', recursive=False) == ['./setup.py']
+        assert path_files('./ae/paths.py', recursive=False) == ['./ae/paths.py']
+
+        assert path_files('ae', recursive=False) == []
+        assert path_files('ae/paths.py', recursive=False) == ['ae/paths.py']
+
+        assert path_files('tests', recursive=False) == []
+        assert path_files('tests/test_paths.py') == ['tests/test_paths.py']
+
+    def test_placeholders(self):
+        assert len(path_files('{cwd}')) == len(path_files('.'))
+        assert path_files('{cwd}/ae/paths.py', recursive=False)[0].endswith('/ae_paths/ae/paths.py')
+
+        assert len(path_files('{cwd}/**/*.py')) == 4    # ...setup.py, ...paths.py, ...test_paths.py, ...conftest.py
+        assert all(_.endswith('.py') for _ in path_files('{cwd}/**/*.py'))
+        assert all(_.startswith(os.path.sep) for _ in path_files('{cwd}/**/*.py'))
+
+    def test_wildcards(self):
+        assert path_files('*.py') == ['setup.py']
+        assert path_files('**.py') == ['setup.py']
+
+        assert path_files('set??.py') == ['setup.py']
+        assert path_files('setup*.py') == ['setup.py']
+        assert path_files('setup**.py') == ['setup.py']
+
+        assert 'ae/paths.py' in path_files('ae/**')
+        assert path_files('ae/**/*.py') == ['ae/paths.py']
+        assert path_files('**/pat?s.py') == ['ae/paths.py']
+
         assert len(path_files('**/*.py')) == 4
         assert path_files('**/*.py') == ['setup.py', 'ae/paths.py', 'tests/test_paths.py', 'tests/conftest.py']
 
-    def test_path_files_placeholders(self):
-        assert len(path_files('.')) == len(path_files('{cwd}'))
-        assert path_files('**.py') == ['setup.py']
-        assert len(path_files('{cwd}/**/*.py')) == 4
+        assert path_files('{cwd}/**/paths.py')[0].endswith('ae_paths/ae/paths.py')
+        assert path_files('{cwd}/**/paths.?y')[0].endswith('ae_paths/ae/paths.py')
 
-    def test_path_files_wildcards(self):
-        assert path_files('**/pat?s.py') == ['ae/paths.py']
         assert len(path_files('{cwd}/**/*paths.py')) == 2
         assert len(path_files('{cwd}/**/*paths.?y')) == 2
 
-    def test_path_file_class(self):
+    def test_file_callable(self):
         def add_file(file_name, **kwargs):
             """ callable used for the file_class argument of path_files. """
             added.append((file_name, kwargs))
             return file_name
         added = list()
         found = path_files('**.py', file_class=add_file, a=1, b=2)
+
         assert len(found) == len(added)
-        assert found[0] == added[0][0]
+        assert len(found) == 1
+        assert found[0] == 'setup.py'
+        assert added[0][0] == found[0]
         assert added[0][1] == dict(a=1, b=2)
+
+    def test_file_class(self):
+        class FileClass:
+            """ class used for the file_class argument of path_files. """
+            def __init__(self, file_name, **kwargs):
+                self.file_name = file_name
+                self.stem = os.path.splitext(file_name)[0]
+                added.append((file_name, kwargs))
+        added = list()
+        found = path_files('*.py', file_class=FileClass, a=3, b=6)
+
+        assert len(found) == len(added)
+        assert len(found) == 1
+        assert found[0].file_name == 'setup.py'
+        assert found[0].stem == 'setup'
+        assert added[0][0] == found[0].file_name
+        assert added[0][1] == dict(a=3, b=6)
+
+    def test_path_lib(self):
+        found = path_files('*.py', file_class=pathlib.PurePath)
+
+        assert len(found) == 1
+        assert found[0].name == 'setup.py'
+        assert found[0].stem == 'setup'
+
+        found = path_files('*.py', file_class=pathlib.Path)
+
+        assert len(found) == 1
+        assert found[0].name == 'setup.py'
+        assert found[0].stem == 'setup'
+
+
+class TestPathFolders:
+    def test_without_placeholders_and_wildcards(self):
+        assert path_folders('setup.py') == []
+        assert path_folders('ae/paths.py') == []
+        assert path_folders('tests/test_paths.py') == []
+
+        assert path_folders('../ae_paths') == ['../ae_paths']
+        assert path_folders('../ae_paths/setup.py') == []
+
+        assert path_folders('.') == ['.']
+        assert all(_[0] == '.' for _ in path_folders('.'))
+        assert path_folders('./setup.py') == []
+
+        assert path_folders('ae') == ['ae']
+        assert 'ae/paths.py' not in path_folders('ae')        # can also contain __pycache__/paths.cpython-36.pyc
+        assert path_folders('ae/paths.py') == []
+
+        assert path_folders('tests') == ['tests']
+        assert 'tests/test_paths.py' not in path_folders('tests')
+        assert path_folders('tests/test_paths.py') == []
+
+    def test_non_recursive(self):
+        assert path_folders('setup.py', recursive=False) == []
+        assert path_folders('ae/paths.py', recursive=False) == []
+        assert path_folders('tests/test_paths.py', recursive=False) == []
+
+        assert path_folders('../ae_paths', recursive=False) == ['../ae_paths']
+        assert path_folders('../ae_paths/setup.py', recursive=False) == []
+
+        assert path_folders('.', recursive=False) == ['.']
+        assert path_folders('./setup.py', recursive=False) == []
+        assert path_folders('./ae/paths.py', recursive=False) == []
+
+        assert path_folders('ae', recursive=False) == ['ae']
+        assert path_folders('ae/paths.py', recursive=False) == []
+
+        assert path_folders('tests', recursive=False) == ['tests']
+        assert path_folders('tests/test_paths.py') == []
+
+    def test_placeholders(self):
+        assert len(path_folders('{cwd}')) == len(path_folders('.'))
+        assert path_folders('{cwd}/ae', recursive=False)[0].endswith('/ae_paths/ae')
+
+        assert path_folders('{cwd}/**')
+        assert any(_.endswith('/ae_paths/ae') for _ in path_folders('{cwd}/**'))
+        assert any(_.endswith('/ae_paths/tests') for _ in path_folders('{cwd}/**'))
+        assert all(_.startswith(os.path.sep) for _ in path_folders('{cwd}/**'))
+
+    def test_wildcards(self):
+        assert path_folders('*.py') == []
+        assert path_folders('**.py') == []
+
+        assert path_folders('set??.py') == []
+        assert path_folders('setup*.py') == []
+        assert path_folders('setup**.py') == []
+
+        assert '../ae_paths/ae' in path_folders('../ae_paths/**')
+        assert '../ae_paths/ae/' in path_folders('../ae_paths/ae/**')
+
+        assert path_folders('**')
+        assert 'ae' in path_folders('**')
+        assert 'tests' in path_folders('**')
+
+        assert any(_.endswith('ae_paths/ae') for _ in path_folders('{cwd}/**'))
+        assert any(_.endswith('ae_paths/ae/') for _ in path_folders('{cwd}/**/'))
+
+    def test_folder_callable(self):
+        def add_folder(folder_name, **kwargs):
+            """ callable used for the file_class argument of path_folders. """
+            added.append((folder_name, kwargs))
+            return folder_name
+        added = list()
+        found = path_folders('tests', folder_class=add_folder, a=1, b=2)
+
+        assert len(found) == len(added)
+        assert len(found) == 1
+        assert found[0] == 'tests'
+        assert added[0][0] == found[0]
+        assert added[0][1] == dict(a=1, b=2)
+
+    def test_file_class(self):
+        class FileClass:
+            """ class used for the file_class argument of path_folders. """
+            def __init__(self, file_name, **kwargs):
+                self.folder_name = file_name
+                self.stem = os.path.splitext(file_name)[0]
+                added.append((file_name, kwargs))
+        added = list()
+        found = path_folders('tests', folder_class=FileClass, a=3, b=6)
+
+        assert len(found) == len(added)
+        assert len(found) == 1
+        assert found[0].folder_name == 'tests'
+        assert found[0].stem == 'tests'
+        assert added[0][0] == found[0].folder_name
+        assert added[0][1] == dict(a=3, b=6)
+
+    def test_path_lib(self):
+        found = path_folders('tests', folder_class=pathlib.PurePath)
+
+        assert len(found) == 1
+        assert found[0].name == 'tests'
+        assert found[0].stem == 'tests'
+
+        found = path_folders('tests', folder_class=pathlib.Path)
+
+        assert len(found) == 1
+        assert found[0].name == 'tests'
+        assert found[0].stem == 'tests'
+
+
+class TestPathItems:
+    def test_without_placeholders_and_wildcards(self):
+        assert path_items('setup.py') == ['setup.py']
+        assert path_items('ae/paths.py') == ['ae/paths.py']
+        assert path_items('tests/test_paths.py') == ['tests/test_paths.py']
+
+        assert path_items('../ae_paths') == ['../ae_paths']
+        assert path_items('../ae_paths/setup.py') == ['../ae_paths/setup.py']
+
+        assert path_items('.') == ['.']
+        assert all(_[0] == '.' for _ in path_items('.'))
+        assert path_items('./setup.py') == ['./setup.py']
+
+        assert path_items('ae') == ['ae']
+        assert 'ae/paths.py' not in path_items('ae')        # can also contain __pycache__/paths.cpython-36.pyc
+        assert path_items('ae/paths.py') == ['ae/paths.py']
+
+        assert path_items('tests') == ['tests']
+        assert 'tests/test_paths.py' not in path_items('tests')
+        assert path_items('tests/test_paths.py') == ['tests/test_paths.py']
+
+    def test_non_recursive(self):
+        assert path_items('setup.py', recursive=False) == ['setup.py']
+        assert path_items('ae/paths.py', recursive=False) == ['ae/paths.py']
+        assert path_items('tests/test_paths.py', recursive=False) == ['tests/test_paths.py']
+
+        assert path_items('../ae_paths', recursive=False) == ['../ae_paths']
+        assert path_items('../ae_paths/setup.py', recursive=False) == ['../ae_paths/setup.py']
+
+        assert path_items('.', recursive=False) == ['.']
+        assert path_items('./setup.py', recursive=False) == ['./setup.py']
+        assert path_items('./ae/paths.py', recursive=False) == ['./ae/paths.py']
+
+        assert path_items('ae', recursive=False) == ['ae']
+        assert path_items('ae/paths.py', recursive=False) == ['ae/paths.py']
+
+        assert path_items('tests', recursive=False) == ['tests']
+        assert path_items('tests/test_paths.py') == ['tests/test_paths.py']
+
+    def test_placeholders(self):
+        assert len(path_items('{cwd}')) == len(path_items('.'))
+        assert path_items('{cwd}/ae/paths.py', recursive=False)[0].endswith('/ae_paths/ae/paths.py')
+
+        assert len(path_items('{cwd}/**/*.py')) == 4    # ...setup.py, ...paths.py, ...test_paths.py, ...conftest.py
+        assert all(_.endswith('.py') for _ in path_items('{cwd}/**/*.py'))
+        assert all(_.startswith(os.path.sep) for _ in path_items('{cwd}/**/*.py'))
+
+    def test_wildcards(self):
+        assert path_items('*.py') == ['setup.py']
+        assert path_items('**.py') == ['setup.py']
+
+        assert path_items('set??.py') == ['setup.py']
+        assert path_items('setup*.py') == ['setup.py']
+        assert path_items('setup**.py') == ['setup.py']
+
+        assert 'ae/paths.py' in path_items('ae/**')
+        assert path_items('ae/**/*.py') == ['ae/paths.py']
+        assert path_items('**/pat?s.py') == ['ae/paths.py']
+
+        assert len(path_items('**/*.py')) == 4
+        assert path_items('**/*.py') == ['setup.py', 'ae/paths.py', 'tests/test_paths.py', 'tests/conftest.py']
+
+        assert path_items('{cwd}/**/paths.py')[0].endswith('ae_paths/ae/paths.py')
+        assert path_items('{cwd}/**/paths.?y')[0].endswith('ae_paths/ae/paths.py')
+
+        assert len(path_items('{cwd}/**/*paths.py')) == 2
+        assert len(path_items('{cwd}/**/*paths.?y')) == 2
+
+    def test_file_callable(self):
+        def add_file(file_name, **kwargs):
+            """ callable used for the file_class argument of path_files. """
+            added.append((file_name, kwargs))
+            return file_name
+        added = list()
+        found = path_items('**.py', creator=add_file, a=1, b=2)
+
+        assert len(found) == len(added)
+        assert len(found) == 1
+        assert found[0] == 'setup.py'
+        assert added[0][0] == found[0]
+        assert added[0][1] == dict(a=1, b=2)
+
+    def test_file_class(self):
+        class FileClass:
+            """ class used for the file_class argument of path_files. """
+            def __init__(self, file_name, **kwargs):
+                self.file_name = file_name
+                self.stem = os.path.splitext(file_name)[0]
+                added.append((file_name, kwargs))
+        added = list()
+        found = path_items('*.py', creator=FileClass, a=3, b=6)
+
+        assert len(found) == len(added)
+        assert len(found) == 1
+        assert found[0].file_name == 'setup.py'
+        assert found[0].stem == 'setup'
+        assert added[0][0] == found[0].file_name
+        assert added[0][1] == dict(a=3, b=6)
+
+    def test_path_lib(self):
+        found = path_files('*.py', file_class=pathlib.PurePath)
+
+        assert len(found) == 1
+        assert found[0].name == 'setup.py'
+        assert found[0].stem == 'setup'
+
+        found = path_items('*.py', creator=pathlib.Path)
+
+        assert len(found) == 1
+        assert found[0].name == 'setup.py'
+        assert found[0].stem == 'setup'
 
 
 class TestCollector:
