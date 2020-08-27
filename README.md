@@ -65,8 +65,8 @@ More info on the features and usage of this portion are available at
 [ReadTheDocs](https://ae.readthedocs.io/en/latest/_autosummary/ae.paths.html#module-ae.paths
 "ae_paths documentation").
 
-<!-- Common files version 0.0.55 deployed  version 0.0.1 (with 0.0.55)
+<!-- Common files version 0.0.60 deployed version 0.1.2 (with 0.0.60)
      to https://gitlab.com/ae-group as ae_paths module as well as
      to https://ae-group.gitlab.io with CI check results as well as
-     to https://pypi.org/project as ae-paths package.
+     to https://pypi.org/project/ae-paths as namespace portion ae-paths.
 -->
