@@ -2,7 +2,7 @@
 generic file path helpers
 =========================
 
-This module is pure python, does only depend on the namespace portion :mod:`ae.system`
+This module is pure python, does only depend on the namespace portion :mod:`ae.base`
 and is providing generic file paths together with useful helper functions and classes
 that are independent from the operating system.
 
@@ -124,10 +124,10 @@ import shutil
 from typing import Any, Callable, Dict, Iterable, List, Tuple, Type, Union
 # from mypy_extensions import KwArg
 
-from ae.system import app_name_guess, env_str, sys_platform             # type: ignore
+from ae.base import app_name_guess, env_str, sys_platform                   # type: ignore
 
 
-__version__ = '0.1.2'
+__version__ = '0.1.3'
 
 
 def app_data_path() -> str:
