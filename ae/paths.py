@@ -127,7 +127,7 @@ from typing import Any, Callable, Dict, Iterable, List, Tuple, Type, Union
 from ae.base import app_name_guess, env_str, sys_platform                   # type: ignore
 
 
-__version__ = '0.1.3'
+__version__ = '0.1.4'
 
 
 def app_data_path() -> str:
@@ -137,7 +137,7 @@ def app_data_path() -> str:
 
     :return:    path string of the user app data folder.
     """
-    return os.path.join(user_data_path(), app_name_guess())
+    return os.path.join(user_data_path(), PATH_PLACEHOLDERS['app_name'])
 
 
 def app_docs_path() -> str:
@@ -147,7 +147,7 @@ def app_docs_path() -> str:
 
     :return:    path string of the user documents app folder.
     """
-    return os.path.join(user_docs_path(), app_name_guess())
+    return os.path.join(user_docs_path(), PATH_PLACEHOLDERS['app_name'])
 
 
 def move_path(src_folder: str, dst_folder: str, overwrite: bool = False) -> List[str]:
