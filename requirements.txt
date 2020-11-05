@@ -1,2 +1,3 @@
 # dependencies of the paths portion
+# pyjnius/jnius only needed on android
 ae_base

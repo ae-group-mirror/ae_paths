@@ -124,10 +124,10 @@ import shutil
 from typing import Any, Callable, Dict, Iterable, List, Tuple, Type, Union
 # from mypy_extensions import KwArg
 
-from ae.base import app_name_guess, env_str, sys_platform                   # type: ignore
+from ae.base import app_name_guess, env_str, os_platform                   # type: ignore
 
 
-__version__ = '0.1.4'
+__version__ = '0.1.5'
 
 
 def app_data_path() -> str:
@@ -254,8 +254,7 @@ def user_data_path() -> str:
 
     :return:    path string of the user data folder.
     """
-    platform = sys_platform()
-    if platform == 'android':               # pragma: no cover
+    if os_platform == 'android':            # pragma: no cover
         from jnius import autoclass, cast   # type: ignore  # pylint: disable=no-name-in-module, import-outside-toplevel
         # noinspection PyPep8Naming
         PythonActivity = autoclass('org.kivy.android.PythonActivity')   # pylint: disable=invalid-name
@@ -263,13 +262,13 @@ def user_data_path() -> str:
         file_p = cast('java.io.File', context.getFilesDir())
         data_path = file_p.getAbsolutePath()
 
-    elif platform in ('win32', 'cygwin'):
+    elif os_platform in ('win32', 'cygwin'):
         data_path = env_str('APPDATA')
 
     else:
-        if platform == 'ios':
+        if os_platform == 'ios':
             data_path = 'Documents'
-        elif platform == 'darwin':
+        elif os_platform == 'darwin':
             data_path = os.path.join('Library', 'Application Support')
         else:                                       # platform == 'linux' or 'freebsd' or anything else
             data_path = env_str('XDG_CONFIG_HOME') or '.config'
@@ -287,14 +286,13 @@ def user_docs_path() -> str:
 
     :return:    path string of the user documents folder.
     """
-    platform = sys_platform()
-    if platform == 'android':           # pragma: no cover
+    if os_platform == 'android':           # pragma: no cover
         from jnius import autoclass     # type: ignore  # pylint: disable=no-name-in-module, import-outside-toplevel
         # noinspection PyPep8Naming
         Environment = autoclass('android.os.Environment')  # pylint: disable=invalid-name
         docs_path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS).getAbsolutePath()
 
-    elif platform in ('win32', 'cygwin'):
+    elif os_platform in ('win32', 'cygwin'):
         docs_path = os.path.join(env_str('USERPROFILE'), 'Documents')
 
     else:

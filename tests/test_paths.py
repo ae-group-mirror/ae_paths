@@ -1,11 +1,11 @@
 """ ae.paths unit tests """
 import pytest
-
 import os
 import pathlib
 import shutil
-import sys
-from ae.base import app_name_guess, sys_platform
+from unittest.mock import patch
+
+from ae.base import app_name_guess, os_platform
 from ae.paths import (app_data_path, app_docs_path, move_path, path_files, path_folders, path_items,
                       user_data_path, user_docs_path, Collector)
 
@@ -24,165 +24,76 @@ class TestAppPaths:
 
 class TestUserDataPath:
     def test_user_data_path_android(self):
-        if sys_platform() != 'android':
+        if os_platform != 'android':
             pytest.skip("android-only test")
-        try:
-            os.environ['ANDROID_ARGUMENT'] = 'tst'
-            assert user_data_path() == 'android'
-        finally:
-            os.environ.pop('ANDROID_ARGUMENT', None)
-
-        try:
-            os.environ['KIVY_BUILD'] = 'android'
-            assert user_data_path() == 'android'
-        finally:
-            os.environ.pop('KIVY_BUILD', None)
+        with patch('ae.paths.os_platform', 'android'), patch.dict('os.environ', dict(ANDROID_ARGUMENT='any_value')):
+            assert user_data_path()
+        with patch('ae.paths.os_platform', 'android'), patch.dict('os.environ', dict(KIVY_BUILD='any_value')):
+            assert user_data_path()
 
     def test_user_data_path_cygwin(self):
         test_root = '/test_path'
-        old_platform = sys.platform
-        old_env = os.environ.get('APPDATA')
-        try:
-            sys.platform = 'cygwin'
-            os.environ['APPDATA'] = test_root
+        with patch('ae.paths.os_platform', 'cygwin'), patch.dict('os.environ', dict(APPDATA=test_root)):
             assert user_data_path() == test_root
-        finally:
-            if old_env:
-                os.environ['APPDATA'] = old_env
-            else:
-                os.environ.pop('APPDATA', None)
-            sys.platform = old_platform
 
     def test_user_data_path_darwin(self):
-        old_platform = sys.platform
-        try:
-            sys.platform = 'darwin'
+        with patch('ae.paths.os_platform', 'darwin'):
             assert user_data_path() == os.path.expanduser(os.path.join('~', 'Library', 'Application Support'))
-        finally:
-            sys.platform = old_platform
 
     def test_user_data_path_ios(self):
-        old_platform = sys.platform
-        try:
-            sys.platform = 'ios'
+        with patch('ae.paths.os_platform', 'ios'):
             assert user_data_path() == os.path.expanduser(os.path.join('~', 'Documents'))
-        finally:
-            sys.platform = old_platform
 
     def test_user_data_path_linux(self):  # or _freebsd or any other os
         test_path = '.config'
-        old_platform = sys.platform
-        old_env = os.environ.get('XDG_CONFIG_HOME')
-        try:
-            sys.platform = 'linux'
-            os.environ['XDG_CONFIG_HOME'] = test_path
+        with patch('ae.paths.os_platform', 'linux'), patch.dict('os.environ', dict(XDG_CONFIG_HOME=test_path)):
             assert user_data_path().endswith(test_path)
-
-            os.environ['XDG_CONFIG_HOME'] = ""
+        with patch('ae.paths.os_platform', 'linux'), patch.dict('os.environ', dict(XDG_CONFIG_HOME="")):
             assert user_data_path().endswith(test_path)
-
-            sys.platform = 'freebsd'
-            os.environ['XDG_CONFIG_HOME'] = test_path
+        with patch('ae.paths.os_platform', 'freebsd'), patch.dict('os.environ', dict(XDG_CONFIG_HOME=test_path)):
             assert user_data_path().endswith(test_path)
-
-            os.environ['XDG_CONFIG_HOME'] = ""
+        with patch('ae.paths.os_platform', 'freebsd'), patch.dict('os.environ', dict(XDG_CONFIG_HOME="")):
             assert user_data_path().endswith(test_path)
-        finally:
-            if old_env:
-                os.environ['XDG_CONFIG_HOME'] = old_env
-            else:
-                os.environ.pop('XDG_CONFIG_HOME', None)
-            sys.platform = old_platform
 
     def test_user_data_path_win32(self):
         test_root = '/test_path'
-        old_platform = sys.platform
-        old_env = os.environ.get('APPDATA')
-        try:
-            sys.platform = 'win32'
-            os.environ['APPDATA'] = test_root
+        with patch('ae.paths.os_platform', 'win32'), patch.dict('os.environ', dict(APPDATA=test_root)):
             assert user_data_path() == test_root
-        finally:
-            if old_env:
-                os.environ['APPDATA'] = old_env
-            else:
-                os.environ.pop('APPDATA', None)
-            sys.platform = old_platform
 
 
 class TestUserDocsPath:
     def test_user_docs_path_android(self):
-        if sys_platform() != 'android':
+        if os_platform != 'android':
             pytest.skip("android-only test")
-        try:
-            os.environ['ANDROID_ARGUMENT'] = 'tst'
-            assert user_docs_path() == 'android'
-        finally:
-            os.environ.pop('ANDROID_ARGUMENT', None)
-
-        try:
-            os.environ['KIVY_BUILD'] = 'android'
-            assert user_docs_path() == 'android'
-        finally:
-            os.environ.pop('KIVY_BUILD', None)
+        with patch('ae.paths.os_platform', 'android'), patch.dict('os.environ', dict(ANDROID_ARGUMENT='any_value')):
+            assert user_docs_path()
+        with patch('ae.paths.os_platform', 'android'), patch.dict('os.environ', dict(KIVY_BUILD='any_value')):
+            assert user_docs_path()
 
     def test_user_docs_path_cygwin(self):
         test_root = '/test_path'
-        old_platform = sys.platform
-        old_env = os.environ.get('USERPROFILE')
-        try:
-            sys.platform = 'cygwin'
-            os.environ['USERPROFILE'] = test_root
+        with patch('ae.paths.os_platform', 'cygwin'), patch.dict('os.environ', dict(USERPROFILE=test_root)):
             assert user_docs_path() == test_root + '/Documents'
-        finally:
-            if old_env:
-                os.environ['USERPROFILE'] = old_env
-            else:
-                os.environ.pop('USERPROFILE', None)
-            sys.platform = old_platform
 
     def test_user_docs_path_darwin(self):
-        old_platform = sys.platform
-        try:
-            sys.platform = 'darwin'
+        with patch('ae.paths.os_platform', 'darwin'):
             assert user_docs_path() == os.path.expanduser(os.path.join('~', 'Documents'))
-        finally:
-            sys.platform = old_platform
 
     def test_user_docs_path_ios(self):
-        old_platform = sys.platform
-        try:
-            sys.platform = 'ios'
+        with patch('ae.paths.os_platform', 'ios'):
             assert user_docs_path() == os.path.expanduser(os.path.join('~', 'Documents'))
-        finally:
-            sys.platform = old_platform
 
     def test_user_docs_path_linux(self):  # or _freebsd or any other os
         test_path = 'Documents'
-        old_platform = sys.platform
-        try:
-            sys.platform = 'linux'
+        with patch('ae.paths.os_platform', 'linux'):
             assert user_docs_path().endswith(test_path)
-
-            sys.platform = 'freebsd'
+        with patch('ae.paths.os_platform', 'freebsd'):
             assert user_docs_path().endswith(test_path)
-        finally:
-            sys.platform = old_platform
 
     def test_user_docs_path_win32(self):
         test_root = '/test_path'
-        old_platform = sys.platform
-        old_env = os.environ.get('USERPROFILE')
-        try:
-            sys.platform = 'win32'
-            os.environ['USERPROFILE'] = test_root
+        with patch('ae.paths.os_platform', 'win32'), patch.dict('os.environ', dict(USERPROFILE=test_root)):
             assert user_docs_path() == test_root + '/Documents'
-        finally:
-            if old_env:
-                os.environ['USERPROFILE'] = old_env
-            else:
-                os.environ.pop('USERPROFILE', None)
-            sys.platform = old_platform
 
 
 FILE0 = 'app.ini'
