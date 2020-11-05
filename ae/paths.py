@@ -127,7 +127,7 @@ from typing import Any, Callable, Dict, Iterable, List, Tuple, Type, Union
 from ae.base import app_name_guess, env_str, os_platform                   # type: ignore
 
 
-__version__ = '0.1.5'
+__version__ = '0.1.6'
 
 
 def app_data_path() -> str:

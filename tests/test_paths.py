@@ -5,7 +5,7 @@ import pathlib
 import shutil
 from unittest.mock import patch
 
-from ae.base import app_name_guess, os_platform
+from ae.base import app_name_guess, file_content, file_write, os_platform
 from ae.paths import (app_data_path, app_docs_path, move_path, path_files, path_folders, path_items,
                       user_data_path, user_docs_path, Collector)
 
@@ -126,20 +126,6 @@ def files_to_move(request, tmpdir):
     # shutil.rmtree(tmpdir)
 
 
-def _create_file_at_destination(dst_folder):
-    """ create file0 at destination folder for to block move. """
-    dst_file = os.path.join(dst_folder, FILE0)
-    with open(dst_file, 'w') as fp:
-        fp.write(OLD_CONTENT0)
-    return dst_file
-
-
-def _file_content(fn):
-    with open(fn) as fp:
-        fc = fp.read()
-    return fc
-
-
 class TestMovePath:
     def test_moves_to_parent_dir(self, files_to_move):
         src_dir = os.path.dirname(files_to_move[0])
@@ -158,7 +144,8 @@ class TestMovePath:
     def test_blocked_moves_to_parent_dir(self, files_to_move):
         src_dir = os.path.dirname(files_to_move[0])
         dst_dir = os.path.join(src_dir, '..')
-        dst_block_file = _create_file_at_destination(dst_dir)
+        dst_block_file = os.path.join(dst_dir, FILE0)
+        file_write(OLD_CONTENT0, dst_block_file)
         assert os.path.exists(dst_block_file)
         for src_file_path in files_to_move:
             assert os.path.exists(src_file_path)
@@ -169,15 +156,15 @@ class TestMovePath:
 
         if MOVES_SRC_FOLDER_NAME in src_dir:
             assert os.path.exists(files_to_move[0])
-            assert _file_content(files_to_move[0]) == CONTENT0
+            assert file_content(files_to_move[0]) == CONTENT0
             dst_file = os.path.join(dst_dir, os.path.relpath(files_to_move[0], src_dir))
             assert os.path.exists(dst_file)
-            assert _file_content(dst_file) == OLD_CONTENT0
+            assert file_content(dst_file) == OLD_CONTENT0
 
             assert not os.path.exists(files_to_move[1])
             dst_file = os.path.join(dst_dir, os.path.relpath(files_to_move[1], src_dir))
             assert os.path.exists(dst_file)
-            assert _file_content(dst_file) == CONTENT1
+            assert file_content(dst_file) == CONTENT1
 
     def test_overwrites_to_parent_dir(self, files_to_move):
         src_dir = os.path.dirname(files_to_move[0])
@@ -196,7 +183,8 @@ class TestMovePath:
     def test_unblocked_overwrites_to_parent_dir(self, files_to_move):
         src_dir = os.path.dirname(files_to_move[0])
         dst_dir = os.path.join(src_dir, '..')
-        dst_block_file = _create_file_at_destination(dst_dir)
+        dst_block_file = os.path.join(dst_dir, FILE0)
+        file_write(OLD_CONTENT0, dst_block_file)
         assert os.path.exists(dst_block_file)
         for src_file_path in files_to_move:
             assert os.path.exists(src_file_path)
@@ -209,12 +197,12 @@ class TestMovePath:
             assert not os.path.exists(files_to_move[0])
             dst_file = os.path.join(dst_dir, os.path.relpath(files_to_move[0], src_dir))
             assert os.path.exists(dst_file)
-            assert _file_content(dst_file) == CONTENT0
+            assert file_content(dst_file) == CONTENT0
 
             assert not os.path.exists(files_to_move[1])
             dst_file = os.path.join(dst_dir, os.path.relpath(files_to_move[1], src_dir))
             assert os.path.exists(dst_file)
-            assert _file_content(dst_file) == CONTENT1
+            assert file_content(dst_file) == CONTENT1
 
     def test_file_moves_to_user_dir_via_check_all(self, files_to_move):
         src_dir = os.path.dirname(files_to_move[0])
