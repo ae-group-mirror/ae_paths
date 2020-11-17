@@ -1,3 +1,5 @@
 # dependencies of the paths portion
 # pyjnius/jnius only needed on android
+# plyer only needed for add_common_storage_paths() testing.
+plyer
 ae_base
