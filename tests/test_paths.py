@@ -6,11 +6,29 @@ import shutil
 from unittest.mock import patch
 
 from ae.base import app_name_guess, file_content, file_write, os_platform
-from ae.paths import (app_data_path, app_docs_path, move_path, path_files, path_folders, path_items,
+from ae.paths import (PATH_PLACEHOLDERS,
+                      add_common_storage_paths, app_data_path, app_docs_path, move_path,
+                      path_files, path_folders, path_items,
                       user_data_path, user_docs_path, Collector)
 
 
 class TestAppPaths:
+    def test_add_common_storage_paths(self):
+        paths_count = len(PATH_PLACEHOLDERS)
+        add_common_storage_paths()
+        assert len(PATH_PLACEHOLDERS) > paths_count
+        assert 'application' in PATH_PLACEHOLDERS
+        assert 'documents' in PATH_PLACEHOLDERS
+        assert 'downloads' in PATH_PLACEHOLDERS
+        assert 'external_storage' in PATH_PLACEHOLDERS
+        assert 'home' in PATH_PLACEHOLDERS
+        assert 'music' in PATH_PLACEHOLDERS
+        assert 'pictures' in PATH_PLACEHOLDERS
+        assert 'root' in PATH_PLACEHOLDERS
+        if os_platform == 'android':
+            assert 'sdcard' in PATH_PLACEHOLDERS
+        assert 'videos' in PATH_PLACEHOLDERS
+
     def test_app_data_path(self):
         assert app_data_path()
         assert app_data_path().endswith(app_name_guess())

@@ -2,8 +2,7 @@
 generic file path helpers
 =========================
 
-This module is pure python, does only depend on the namespace portion :mod:`ae.base`
-and is providing generic file paths together with useful helper functions and classes
+This namespace portion is pure python is providing generic file paths together with useful helper functions and classes
 that are independent from the operating system.
 
 The currently support operating systems are:
@@ -14,20 +13,27 @@ The currently support operating systems are:
     * MacOS
     * Windows
 
+The only external hard dependency of this module is the ae namespace portion :mod:`ae.base`. Optional dependencies are:
+
+    * on android OS the PyPi package `jnius`, needed by the functions :func:`user_data_path` and :func:`user_docs_path`.
+    * the `plyer` PyPi package, needed by the function :func:`add_common_storage_paths`.
+
 
 generic system paths
 --------------------
 
-Generic system paths are provided by the helper functions:
+Some generic system paths are determined by the helper functions:
 
 * :func:`app_data_path`: application data path.
 * :func:`app_docs_path`: application documents path.
 * :func:`user_data_path`: user data path.
 * :func:`user_docs_path`: user documents path.
 
-Additional generic paths like e.g. the current working directory as
-well as file path parts (like e.g. the user or application name)
-are provided by the :data:`PATH_PLACEHOLDERS` dict.
+Additional generic paths like e.g. the current working directory as well as file path parts (like e.g. the user or
+application name) are provided by the :data:`PATH_PLACEHOLDERS` dict.
+
+By calling the function :func:`add_common_storage_paths` all storage paths provided by the `plyer` package
+will be also added to the :data:`PATH_PLACEHOLDERS` dict.
 
 
 path helper functions
@@ -127,7 +133,19 @@ from typing import Any, Callable, Dict, Iterable, List, Tuple, Type, Union
 from ae.base import app_name_guess, env_str, os_platform                   # type: ignore
 
 
-__version__ = '0.1.6'
+__version__ = '0.1.7'
+
+
+def add_common_storage_paths():
+    """ add the storage paths provided by the `plyer` PyPi package for the current OS to :data:`PATH_PLACEHOLDERS`. """
+    from plyer import storagepath                              # type: ignore  # pylint: disable=import-outside-toplevel
+
+    for attr in dir(storagepath):
+        if attr.startswith('get_') and attr.endswith('_dir'):
+            try:
+                PATH_PLACEHOLDERS[attr[4:-4]] = getattr(storagepath, attr)()
+            except (AttributeError, NotImplementedError):
+                pass
 
 
 def app_data_path() -> str:
@@ -234,8 +252,7 @@ def path_items(item_mask: str, recursive: bool = True, selector: Callable[[str],
     :param creator_kwargs:      additional/optional kwargs passed onto the used item_class apart from the item name.
     :return:                    list of found and selected items of the item class (:paramref:`path_items.item_class`).
     """
-    if '{' in item_mask and '}' in item_mask:
-        item_mask = item_mask.format(**PATH_PLACEHOLDERS)
+    item_mask = item_mask.format(**PATH_PLACEHOLDERS)
     # if recursive and '*' not in item_mask and '?' not in item_mask:
     #    item_mask = os.path.join(item_mask, '**')
 
