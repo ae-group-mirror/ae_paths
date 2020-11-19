@@ -1,5 +1,5 @@
 # dependencies of the paths portion
-# pyjnius/jnius only needed on android
+# pyjnius/jnius only needed on android (where it gets automatically added by kivy/buildozer)
 # plyer only needed for add_common_storage_paths() testing.
 plyer
 ae_base

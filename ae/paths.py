@@ -133,7 +133,7 @@ from typing import Any, Callable, Dict, Iterable, List, Tuple, Type, Union
 from ae.base import app_name_guess, env_str, os_platform                   # type: ignore
 
 
-__version__ = '0.1.9'
+__version__ = '0.1.10'
 
 
 def add_common_storage_paths():
@@ -182,8 +182,8 @@ def move_path(src_folder: str, dst_folder: str, overwrite: bool = False) -> List
     if not dst_folder:
         dst_folder = user_data_path()
     else:
-        dst_folder = dst_folder.format(**PATH_PLACEHOLDERS)
-    src_folder = src_folder.format(**PATH_PLACEHOLDERS)
+        dst_folder = norm_path(dst_folder)
+    src_folder = norm_path(src_folder)
 
     updated = list()
 
@@ -198,6 +198,18 @@ def move_path(src_folder: str, dst_folder: str, overwrite: bool = False) -> List
                     updated.append(shutil.move(src_file, dst_file))
 
     return updated
+
+
+def norm_path(path: str) -> str:
+    """ normalize/transform path replacing PATH_PLACEHOLDERS and the tilde character (for home folder).
+
+    :param path:                path string to normalize/transform.
+    :return:                    normalized path string.
+    """
+    path = path.format(**PATH_PLACEHOLDERS)
+    if path[0] == "~":
+        path = os.path.expanduser(path)
+    return path
 
 
 def path_files(file_mask: str, recursive: bool = True,
@@ -252,7 +264,7 @@ def path_items(item_mask: str, recursive: bool = True, selector: Callable[[str],
     :param creator_kwargs:      additional/optional kwargs passed onto the used item_class apart from the item name.
     :return:                    list of found and selected items of the item class (:paramref:`path_items.item_class`).
     """
-    item_mask = item_mask.format(**PATH_PLACEHOLDERS)
+    item_mask = norm_path(item_mask)
     # if recursive and '*' not in item_mask and '?' not in item_mask:
     #    item_mask = os.path.join(item_mask, '**')
 
