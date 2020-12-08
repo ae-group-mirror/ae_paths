@@ -133,7 +133,7 @@ from typing import Any, Callable, Dict, Iterable, List, Tuple, Type, Union
 from ae.base import app_name_guess, env_str, os_platform                   # type: ignore
 
 
-__version__ = '0.1.10'
+__version__ = '0.1.11'
 
 
 def add_common_storage_paths():
