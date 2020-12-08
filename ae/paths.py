@@ -207,7 +207,7 @@ def norm_path(path: str) -> str:
     :return:                    normalized path string.
     """
     path = path.format(**PATH_PLACEHOLDERS)
-    if path[0] == "~":
+    if path[0:1] == "~":
         path = os.path.expanduser(path)
     return path
 

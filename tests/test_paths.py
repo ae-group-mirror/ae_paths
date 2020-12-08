@@ -45,6 +45,9 @@ class TestPlaceholders:
         assert len(norm_path(file_path)) > len(file_path)
         assert norm_path(file_path).endswith(file_path[1:])
 
+        file_path = ""
+        assert len(norm_path(file_path)) == 0
+
     def test_placeholder_path(self):
         file_name = "test.tst"
         file_path = os.path.join(os.getcwd(), file_name)
