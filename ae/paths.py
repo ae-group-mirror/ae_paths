@@ -127,17 +127,40 @@ files and folders to the respective instance attributes::
 import glob
 import os
 import shutil
+import string
 from typing import Any, Callable, Dict, Iterable, List, Tuple, Type, Union
 # from mypy_extensions import KwArg
 
 from ae.base import app_name_guess, env_str, os_platform                   # type: ignore
 
 
-__version__ = '0.1.11'
+__version__ = '0.1.12'
 
 
 def add_common_storage_paths():
-    """ add the storage paths provided by the `plyer` PyPi package for the current OS to :data:`PATH_PLACEHOLDERS`. """
+    """ add common storage paths to :data:`PATH_PLACEHOLDERS` depending on the operating system (OS).
+
+    The following storage paths are provided by the `plyer` PyPi package (not all of them are available in each OS):
+
+    * `application`: user application directory.
+    * `documents`: user documents directory.
+    * `downloads`: user downloads directory.
+    * `external_storage`: external storage root directory.
+    * `home`: user home directory.
+    * `music`: user music directory.
+    * `pictures`: user pictures directory.
+    * `root`: root directory of the operating system partition.
+    * `sdcard`: SD card root directory.
+    * `videos`: user videos directory.
+
+    Additionally storage paths that are only available on certain OS (inspired by the method `get_drives`, implemented
+    in `<https://github.com/kivy-garden/filebrowser/blob/master/kivy_garden/filebrowser/__init__.py>`_):
+
+    * `Linux`: external storage devices/media mounted underneath the system partition root in /mnt or /media.
+    * `Apple Mac OsX or iOS`: external storage devices/media mounted underneath the system partition root in /Volume.
+    * `MS Windows`: additional drives mapped as the drive partition name.
+
+    """
     from plyer import storagepath                              # type: ignore  # pylint: disable=import-outside-toplevel
 
     for attr in dir(storagepath):
@@ -146,6 +169,33 @@ def add_common_storage_paths():
                 PATH_PLACEHOLDERS[attr[4:-4]] = getattr(storagepath, attr)()
             except (AttributeError, NotImplementedError):
                 pass
+
+    if os_platform == 'linux':
+        places = ('/mnt', '/media')
+        for place in places:
+            if os.path.isdir(place):
+                for directory in next(os.walk(place))[1]:
+                    PATH_PLACEHOLDERS[directory] = os.path.join(place, directory)
+
+    elif os_platform in ('darwin', 'ios'):      # pragma: no cover
+        vol = '/Volume'
+        if os.path.isdir(vol):
+            for drive in next(os.walk(vol))[1]:
+                PATH_PLACEHOLDERS[drive] = os.path.join(vol, drive)
+
+    elif os_platform in ('win32', 'cygwin'):    # pragma: no cover
+        from ctypes import windll, create_unicode_buffer
+
+        bitmask = windll.kernel32.GetLogicalDrives()
+        get_volume_information = windll.kernel32.GetVolumeInformationW
+        for letter in string.ascii_uppercase:
+            drive = letter + ':' + os.path.sep
+            if bitmask & 1 and os.path.isdir(drive):
+                buf_len = 64
+                name = create_unicode_buffer(buf_len)
+                get_volume_information(drive, name, buf_len, None, None, None, None, 0)
+                PATH_PLACEHOLDERS[name.value] = drive
+            bitmask >>= 1
 
 
 def app_data_path() -> str:
