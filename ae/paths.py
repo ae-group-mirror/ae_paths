@@ -134,7 +134,7 @@ from typing import Any, Callable, Dict, Iterable, List, Tuple, Type, Union
 from ae.base import app_name_guess, env_str, os_platform                   # type: ignore
 
 
-__version__ = '0.1.12'
+__version__ = '0.1.13'
 
 
 def add_common_storage_paths():
@@ -326,8 +326,22 @@ def path_items(item_mask: str, recursive: bool = True, selector: Callable[[str],
     return items
 
 
+def path_name(path: str) -> str:
+    """ determine placeholder key name of the specified path.
+
+    :param path:                path string to determine name of (can contain placeholders).
+    :return:                    name (respectively dict key in :data:`PATH_PLACEHOLDERS`) of the found path
+                                or empty string if not found.
+    """
+    search_path = norm_path(path)
+    for name, registered_path in PATH_PLACEHOLDERS.items():
+        if norm_path(registered_path) == search_path:
+            return name
+    return ""
+
+
 def placeholder_path(path: str) -> str:
-    """ replace begin of path string with the longest prefix found in PATH_PLACEHOLDERS.
+    """ replace begin of path string with the longest prefix found in :data:`PATH_PLACEHOLDERS`.
 
     :param path:                path string (optionally including sub-folders and file name).
     :return:                    path string with replaced placeholder prefix (if found).

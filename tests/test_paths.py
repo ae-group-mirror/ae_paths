@@ -8,7 +8,7 @@ from unittest.mock import patch
 from ae.base import app_name_guess, file_content, file_write, os_platform
 from ae.paths import (PATH_PLACEHOLDERS,
                       add_common_storage_paths, app_data_path, app_docs_path, move_path,
-                      norm_path, path_files, path_folders, path_items, placeholder_path,
+                      norm_path, path_files, path_folders, path_items, path_name, placeholder_path,
                       user_data_path, user_docs_path, Collector)
 
 
@@ -47,6 +47,20 @@ class TestPlaceholders:
 
         file_path = ""
         assert len(norm_path(file_path)) == 0
+
+    def test_path_name(self):
+        assert path_name("") == ""
+        assert path_name("/not/a/existing/test/path") == ""
+        assert path_name(".") == ""
+
+        duplicates1 = ('cwd', 'application')
+        duplicates2 = ('doc', 'documents')
+        for name, path in PATH_PLACEHOLDERS.items():
+            if path_name(path) == 'external_storage':
+                assert name == 'external_storage' or path.endswith(name)
+            else:
+                names = duplicates1 if name in duplicates1 else duplicates2 if name in duplicates2 else (name, )
+                assert path_name(path) in names
 
     def test_placeholder_path(self):
         file_name = "test.tst"
