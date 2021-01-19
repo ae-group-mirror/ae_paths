@@ -624,12 +624,13 @@ class TestPathItems:
 
 class TestCollector:
     def test_collect_placeholder(self):
-        coll = Collector(app="tst_app_path", app_name="tst_app_name")
+        coll = Collector(app="tst_app_path", main_app_name="tst_app_name")
         assert "app" in coll.placeholders
-        assert coll.placeholders["app_name"] == "tst_app_name"
+        assert coll.placeholders["app"] == "tst_app_path"
+        assert coll.placeholders["main_app_name"] == "tst_app_name"
 
     def test_collect_nothing_found(self):
-        coll = Collector(app="tst_app_path", app_name="tst_app_name")
+        coll = Collector(app="tst_app_path", main_app_name="tst_app_name")
         prefixes = ("{cwd}/../..", "{app}", "{usr}", "{usr}/{app_name}", "{cwd}/..", "{cwd}", )
         coll.collect(*prefixes, append=(".app_env.cfg", ".sys_env.cfg", ".sys_envTEST.cfg",))
         assert not coll.paths
@@ -641,7 +642,7 @@ class TestCollector:
         assert len(coll.suffix_failed) == 0
 
     def test_collect_appends(self):
-        coll = Collector(app="ae", tst="tests", app_name=__file__)
+        coll = Collector(app="ae", tst="tests", main_app_name=__file__)
         coll.collect("{app}", "ae", "", append=("{app_name}", "paths.py", "", "ae"), only_first_of=())
         assert coll.paths
         assert coll.files
@@ -649,7 +650,7 @@ class TestCollector:
         assert coll.failed == 0
 
     def test_collect_appends_only_first(self):
-        coll = Collector(app="ae", tst="tests", app_name=__file__)
+        coll = Collector(app="ae", tst="tests", main_app_name=__file__)
         coll.collect("{app}", "ae", "", append=("{app_name}", "paths.py", "", "ae"))
         assert not coll.paths
         assert coll.files
@@ -657,15 +658,15 @@ class TestCollector:
         assert coll.failed == 0
 
     def test_collect_append_string(self):
-        coll = Collector(app="ae", tst="tests", app_name=__file__)
-        coll.collect("{app}", "ae", "", append="{app_name}")
+        coll = Collector(app="ae", tst="tests", main_app_name=__file__)
+        coll.collect("{app}", "ae", "", append="{main_app_name}")
         assert not coll.paths
         assert coll.files
         assert not coll.selected
         assert coll.failed == 0
 
     def test_collect_selects(self):
-        coll = Collector(app="ae", tst="tests", app_name="tst_app_name")
+        coll = Collector(app="ae", tst="tests", main_app_name="tst_app_name")
         coll.collect("{cwd}", "{app}", "ae",
                      select=(".*", "README.md", "tests/test_paths.py", "", "ae", ), only_first_of=())
         assert coll.paths
@@ -674,7 +675,7 @@ class TestCollector:
         assert 0 < coll.failed <= len(coll.paths) + len(coll.files)
 
     def test_collect_select_only_first(self):
-        coll = Collector(app="ae", tst="tests", app_name="tst_app_name")
+        coll = Collector(app="ae", tst="tests", main_app_name="tst_app_name")
         coll.collect("{cwd}", "{app}", "ae",
                      select=".*")
         assert not coll.paths
@@ -683,7 +684,7 @@ class TestCollector:
         assert coll.failed == 0
 
     def test_collect_select_string(self):
-        coll = Collector(app="ae", tst="tests", app_name="tst_app_name")
+        coll = Collector(app="ae", tst="tests", main_app_name="tst_app_name")
         coll.collect("{cwd}", "{app}", "ae",
                      select=".*", only_first_of=())
         assert not coll.paths
@@ -692,7 +693,7 @@ class TestCollector:
         assert 0 < coll.failed <= len(coll.paths) + len(coll.files)
 
     def test_collect_prefixes_only(self):
-        coll = Collector(app="ae", tst="tests", app_name="tst_app_name")
+        coll = Collector(app="ae", tst="tests", main_app_name="tst_app_name")
         coll.collect("{app}", "{usr}", "tests/test_paths.py", only_first_of=())
         assert coll.paths
         assert not coll.files
@@ -700,7 +701,7 @@ class TestCollector:
         assert 0 < coll.failed < len(coll.paths) + len(coll.files)
 
     def test_collect_prefixes_only_first_as_string(self):
-        coll = Collector(app="ae", tst="tests", app_name="tst_app_name")
+        coll = Collector(app="ae", tst="tests", main_app_name="tst_app_name")
         coll.collect("{app}", "{usr}", "tests/test_paths.py", only_first_of="prefix")
         assert coll.paths
         assert not coll.files

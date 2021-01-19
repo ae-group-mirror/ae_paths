@@ -60,11 +60,11 @@ and in a folder with the name of the application underneath the user data folder
     coll.collect('{cwd}', '{app}/..', '{usr}/{app_name}', append='xxx.cfg')
     found_files = coll.files
 
-For to add or overwrite the generic path parts values of the application
-name (`{app_name}`) and the application data path (`{app}`) you simply
+For to add or overwrite the generic path parts values of the main application
+name (`{main_app_name}`) and the application data path (`{app}`) you simply
 specify them in the construction of the :class:`Collector` instance::
 
-    coll = Collector(app_name=..., app=...)
+    coll = Collector(main_app_name=..., app=...)
 
 Additionally you can specify any other placeholders that will be
 automatically used and replaced by the :class:`Collector` instance::
@@ -134,7 +134,7 @@ from typing import Any, Callable, Dict, Iterable, List, Tuple, Type, Union
 from ae.base import app_name_guess, env_str, os_platform                   # type: ignore
 
 
-__version__ = '0.1.13'
+__version__ = '0.1.14'
 
 
 def add_common_storage_paths():
@@ -199,23 +199,23 @@ def add_common_storage_paths():
 
 
 def app_data_path() -> str:
-    """ determine the os-specific absolute path of the directory where user app data can be stored.
+    """ determine the os-specific absolute path of the {app} directory where user app data can be stored.
 
-    .. hint:: :func:`app_docs_path` is a more public path to the user.
+    .. hint:: use :func:`app_docs_path` instead for to get a more public path to the user.
 
     :return:    path string of the user app data folder.
     """
-    return os.path.join(user_data_path(), PATH_PLACEHOLDERS['app_name'])
+    return os.path.join(user_data_path(), PATH_PLACEHOLDERS.get('main_app_name', PATH_PLACEHOLDERS['app_name']))
 
 
 def app_docs_path() -> str:
-    """ determine the os-specific absolute path of the directory where user documents app are stored.
+    """ determine the os-specific absolute path of the {ado} directory where user documents app are stored.
 
-    .. hint:: :func:`app_data_path` is a more hidden path to the user.
+    .. hint:: use :func:`app_data_path` instead for to get a more hidden path to the user.
 
     :return:    path string of the user documents app folder.
     """
-    return os.path.join(user_docs_path(), PATH_PLACEHOLDERS['app_name'])
+    return os.path.join(user_docs_path(), PATH_PLACEHOLDERS.get('main_app_name', PATH_PLACEHOLDERS['app_name']))
 
 
 def move_path(src_folder: str, dst_folder: str, overwrite: bool = False) -> List[str]:
@@ -224,15 +224,14 @@ def move_path(src_folder: str, dst_folder: str, overwrite: bool = False) -> List
     :param src_folder:      path to source folder/directory where the files get moved from. Placeholders
                             in :data:`PATH_PLACEHOLDERS` will be recognized and substituted.
     :param dst_folder:      path to destination folder/directory where the files get moved to. If
-                            you pass an empty string then the user data/preferences path will be used.
+                            you pass an empty string then the user data/preferences path ({usr})  will be used.
                             All placeholders in :data:`PATH_PLACEHOLDERS` are recognized and will be substituted.
     :param overwrite:       pass True to overwrite existing files in the destination folder/directory.
     :return:                list of moved files, with their destination path.
     """
     if not dst_folder:
-        dst_folder = user_data_path()
-    else:
-        dst_folder = norm_path(dst_folder)
+        dst_folder = "{usr}"
+    dst_folder = norm_path(dst_folder)
     src_folder = norm_path(src_folder)
 
     updated = list()
@@ -354,9 +353,11 @@ def placeholder_path(path: str) -> str:
 
 
 def user_data_path() -> str:
-    """ determine the os-specific absolute path of the directory where user data can be stored.
+    """ determine the os-specific absolute path of the {usr} directory where user data can be stored.
 
-    .. hint:: :func:`user_docs_path` is a more public path to the user.
+    .. hint::
+        this path is not accessible on Android devices, use :func:`user_docs_path` instead for to get a more public
+        path to the user.
 
     :return:    path string of the user data folder.
     """
@@ -386,9 +387,9 @@ def user_data_path() -> str:
 
 
 def user_docs_path() -> str:
-    """ determine the os-specific absolute path of the directory where the user is storing the personal documents.
+    """ determine the os-specific absolute path of the {doc} directory where the user is storing the personal documents.
 
-    .. hint:: use :func:`user_data_path` instead for to store more hidden user data.
+    .. hint:: use :func:`user_data_path` instead for to get a more hidden user data.
 
     :return:    path string of the user documents folder.
     """
@@ -411,13 +412,11 @@ PATH_PLACEHOLDERS = dict()   #: placeholders of user-, os- and app-specific syst
 
 PATH_PLACEHOLDERS['app_name'] = app_name_guess()
 
-PATH_PLACEHOLDERS['app'] = app_data_path()
 PATH_PLACEHOLDERS['ado'] = app_docs_path()
+PATH_PLACEHOLDERS['app'] = app_data_path()
 PATH_PLACEHOLDERS['cwd'] = os.getcwd()
 PATH_PLACEHOLDERS['doc'] = user_docs_path()
-PATH_PLACEHOLDERS['log'] = 'logs'
-PATH_PLACEHOLDERS['usr'] = PATH_PLACEHOLDERS['eme'] = user_data_path()
-PATH_PLACEHOLDERS['eme'] += "/{app_name}/{log}/ae"
+PATH_PLACEHOLDERS['usr'] = user_data_path()
 
 
 class Collector:
@@ -452,7 +451,7 @@ class Collector:
         :return:                True if at least one file/folder got found/added, else False.
         """
         added_any = False
-        for file_path in self._path_scanner(name) if '*' in name or '?' in name else (name,):
+        for file_path in self._path_scanner(name) if '*' in name or '?' in name else (name, ):
             found = True
             if os.path.isdir(file_path):
                 self.paths.append(file_path)
