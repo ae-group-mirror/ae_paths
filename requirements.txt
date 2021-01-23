@@ -4,3 +4,4 @@
 # ctypes.windll only needed for add_common_storage_paths() under MS Windows.
 plyer
 ae_base
+ae_files
