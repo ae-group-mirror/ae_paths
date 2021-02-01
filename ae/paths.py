@@ -199,7 +199,7 @@ from ae.base import app_name_guess, env_str, os_platform                        
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile     # type: ignore
 
 
-__version__ = '0.1.15'
+__version__ = '0.1.16'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
@@ -242,7 +242,7 @@ def add_common_storage_paths():
         if attr.startswith('get_') and attr.endswith('_dir'):
             try:
                 PATH_PLACEHOLDERS[attr[4:-4]] = getattr(storagepath, attr)()
-            except (AttributeError, NotImplementedError):
+            except (AttributeError, NotImplementedError, FileNotFoundError, Exception):
                 pass
 
     if os_platform == 'linux':

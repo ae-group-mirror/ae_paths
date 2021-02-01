@@ -15,10 +15,6 @@ from ae.paths import (PATH_PLACEHOLDERS,
                       user_data_path, user_docs_path, Collector, FilesRegister)
 
 
-SKIP_EXPRESSION = "'CI_PROJECT_ID' in os.environ"
-skip_gitlab_ci = pytest.mark.skipif(SKIP_EXPRESSION, reason="headless gitlab CI python 3.6 image lacks window system")
-
-
 file_root = 'TstRootFolder'
 file_name = 'tst_file'
 file_ext = '.xy'
@@ -42,7 +38,6 @@ def file_sorter_mock(file):
 
 
 class TestPlaceholders:
-    @skip_gitlab_ci
     def test_add_common_storage_paths(self):
         paths_count = len(PATH_PLACEHOLDERS)
         add_common_storage_paths()
