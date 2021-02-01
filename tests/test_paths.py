@@ -43,16 +43,17 @@ class TestPlaceholders:
         add_common_storage_paths()
         assert len(PATH_PLACEHOLDERS) > paths_count
         assert 'application' in PATH_PLACEHOLDERS
-        assert 'documents' in PATH_PLACEHOLDERS
-        assert 'downloads' in PATH_PLACEHOLDERS
-        assert 'external_storage' in PATH_PLACEHOLDERS
-        assert 'home' in PATH_PLACEHOLDERS
-        assert 'music' in PATH_PLACEHOLDERS
-        assert 'pictures' in PATH_PLACEHOLDERS
-        assert 'root' in PATH_PLACEHOLDERS
+        if 'CI_PROJECT_ID' not in os.environ:           # skip on gitlab CI
+            assert 'documents' in PATH_PLACEHOLDERS
+            assert 'downloads' in PATH_PLACEHOLDERS
+            assert 'external_storage' in PATH_PLACEHOLDERS
+            assert 'home' in PATH_PLACEHOLDERS
+            assert 'music' in PATH_PLACEHOLDERS
+            assert 'pictures' in PATH_PLACEHOLDERS
+            assert 'root' in PATH_PLACEHOLDERS
+            assert 'videos' in PATH_PLACEHOLDERS
         if os_platform == 'android':
             assert 'sdcard' in PATH_PLACEHOLDERS
-        assert 'videos' in PATH_PLACEHOLDERS
 
     def test_norm_path(self):
         f_name = "norm_file.tst"
