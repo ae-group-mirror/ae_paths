@@ -74,7 +74,7 @@ for to collect the files with the name `xxx.cfg` in the current working director
 data folder, and in a folder with the name of the main application underneath the user data folder::
 
     coll = Collector()
-    coll.collect('{cwd}', '{app}/..', '{usr}/{main_app_name}', append='xxx.cfg')
+    coll.collect("{cwd}", "{app}/..", "{usr}/{main_app_name}", append="xxx" + CFG_EXT)
     found_files = coll.files
 
 For to add or overwrite the generic path placeholder parts values of the main application name (`{main_app_name}`) and
@@ -199,7 +199,7 @@ from ae.base import app_name_guess, env_str, os_platform                        
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile     # type: ignore
 
 
-__version__ = '0.1.16'
+__version__ = '0.1.17'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
@@ -431,6 +431,20 @@ def path_name(path: str) -> str:
     return ""
 
 
+def placeholder_key(path: str) -> str:
+    """ determine :data:`PATH_PLACEHOLDERS` key of specified path.
+
+    :param path:                path string starting with a :data:`PATH_PLACEHOLDERS` path prefix.
+    :return:                    placeholder key (if found as path prefix), else empty string.
+    """
+    ph_path = placeholder_path(path)
+    if ph_path[0] == '{':
+        idx = ph_path.find('}')
+        if idx != -1:
+            return ph_path[1:idx]
+    return ""
+
+
 def placeholder_path(path: str) -> str:
     """ replace begin of path string with the longest prefix found in :data:`PATH_PLACEHOLDERS`.
 
@@ -609,26 +623,23 @@ class Collector:
         """ collect additional files/folders by combining the given prefixes with all the given append/select suffixes.
 
         :param prefixes:        tuple of file/folder paths to be used as prefix.
-        :param append:          tuple of file/folder names to be used as suffix.
-        :param select:          tuple of file/folder names to be used as suffix.
-        :param only_first_of:   tuple with the strings `'prefix'`, `'append'` or `'select'`.
-                                If it contains the string `'prefix'` then only the files/folders
-                                of the first combination will be collected. If it contains
-                                `'append'` then only the files/folders of the first combination
-                                done with the suffixes passed into the :paramref:`~collect.append`
-                                argument will be collected. If it contains
-                                `'select'` then only the files/folders of the first combination
-                                done with the suffixes passed into the :paramref:`~collect.select`
-                                argument will be collected.
+        :param append:          tuple of file/folder names to be used as append suffix.
+        :param select:          tuple of file/folder names to be used as select suffix.
+        :param only_first_of:   tuple with the strings `'prefix'`, `'append'` or `'select'` or one of these strings.
+                                If it contains the string `'prefix'` then only the files/folders of the first
+                                combination will be collected. If it contains `'append'` then only the files/folders of
+                                the first combination done with the suffixes passed into the :paramref:`~collect.append`
+                                argument will be collected. If it contains `'select'` then only the files/folders of the
+                                first combination done with the suffixes passed into the :paramref:`~collect.select`
+                                argument will be collected. Pass empty tuple to collect all combinations.
 
-        Each of the passed :paramref:`~collect.prefixes` will be combined with the suffixes
-        specified in :paramref:`~collect.append` and in :paramref:`~collect.select`. The
-        resulting file/folder paths that are exist, will then be added to the appropriate instance attribute,
-        either :attr:`~Collector.files` for a file or :attr:`~Collector.paths` for a folder.
+        Each of the passed :paramref:`~collect.prefixes` will be combined with the suffixes specified in
+        :paramref:`~collect.append` and in :paramref:`~collect.select`. The resulting file/folder paths that are exist,
+        will then be added to the appropriate instance attribute, either :attr:`~Collector.files` for a file or
+        :attr:`~Collector.paths` for a folder.
 
-        Additionally the existing file/folder paths from the combinations of
-        :paramref:`~collect.prefixes` and :paramref:`~collect.select` will be added
-        in the :attr:`~Collector.selected` list attribute.
+        Additionally the existing file/folder paths from the combinations of :paramref:`~collect.prefixes` and
+        :paramref:`~collect.select` will be added in the :attr:`~Collector.selected` list attribute.
 
         All arguments of this method can either be passed either as tuples or as a single string value.
 

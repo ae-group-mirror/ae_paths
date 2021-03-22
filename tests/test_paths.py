@@ -7,12 +7,12 @@ import pathlib
 import shutil
 from unittest.mock import patch
 
-from ae.base import app_name_guess, os_platform
+from ae.base import CFG_EXT, INI_EXT, app_name_guess, os_platform
 from ae.files import read_file_text, write_file_text, CachedFile, RegisteredFile
 from ae.paths import (PATH_PLACEHOLDERS,
                       add_common_storage_paths, app_data_path, app_docs_path, move_files,
-                      norm_path, path_files, path_folders, path_items, path_name, placeholder_path, series_file_name,
-                      user_data_path, user_docs_path, Collector, FilesRegister)
+                      norm_path, path_files, path_folders, path_items, path_name, placeholder_key, placeholder_path,
+                      series_file_name, user_data_path, user_docs_path, Collector, FilesRegister)
 
 
 file_root = 'TstRootFolder'
@@ -82,6 +82,13 @@ class TestPlaceholders:
             else:
                 names = duplicates1 if name in duplicates1 else duplicates2 if name in duplicates2 else (name, )
                 assert path_name(path) in names
+
+    def test_placeholder_key(self):
+        f_name = "test.tst"
+        file_path = os.path.join(os.getcwd(), f_name)
+        assert placeholder_key(f_name) == ""
+        assert placeholder_key(file_path) == "cwd"
+        assert placeholder_key(file_path).format(**PATH_PLACEHOLDERS) == "cwd"
 
     def test_placeholder_path(self):
         f_name = "test.tst"
@@ -178,7 +185,7 @@ class TestUserDocsPath:
             assert user_docs_path() == test_root + "/Documents"
 
 
-FILE0 = "app.ini"
+FILE0 = "app" + INI_EXT
 CONTENT0 = "TEST FILE0 CONTENT"
 OLD_CONTENT0 = "OLD/LOCKED FILE0 CONTENT"
 
@@ -704,7 +711,7 @@ class TestCollector:
     def test_collect_nothing_found(self):
         coll = Collector(app="tst_app_path", main_app_name="tst_app_name")
         prefixes = ("{cwd}/../..", "{app}", "{usr}", "{usr}/{app_name}", "{cwd}/..", "{cwd}", )
-        coll.collect(*prefixes, append=(".app_env.cfg", ".sys_env.cfg", ".sys_envTEST.cfg",))
+        coll.collect(*prefixes, append=(".app_env" + CFG_EXT, ".sys_env" + CFG_EXT, ".sys_envTEST" + CFG_EXT,))
         assert not coll.paths
         # global .app_env.cfg could be found on your local machine - therefore skip: assert not coll.files
         assert not coll.selected
