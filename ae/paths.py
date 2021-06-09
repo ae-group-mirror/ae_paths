@@ -196,7 +196,7 @@ from ae.base import app_name_guess, env_str, os_platform                        
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile     # type: ignore
 
 
-__version__ = '0.1.18'
+__version__ = '0.1.19'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
@@ -712,7 +712,7 @@ class FilesRegister(dict):
     def add_files(self, files: Iterable[FileObject], first_index: int = APPEND_TO_END_OF_FILE_LIST) -> List[str]:
         """ add files from another :class:`FilesRegister` instance.
 
-        :param files:           Iterable with file objects to be added.
+        :param files:           iterable with file objects to be added.
         :param first_index:     pass list index -n-1..n-1 to insert the first file_obj in each name's register list.
                                 values greater than n (==len(file_list)) will append the file_obj to the end of the file
                                 object list. the order of the added items will be unchanged if this value is greater or

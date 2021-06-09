@@ -219,7 +219,7 @@ def files_to_test():
 
 @pytest.fixture(params=[MOVES_SRC_FOLDER_NAME, OVERWRITES_SRC_FOLDER_NAME])
 def files_to_move(request, tmpdir):
-    """ create test files in source directory for to be moved and/or overwritten. """
+    """ create test files in source directory to be moved and/or overwritten. """
     src_dir = tmpdir.mkdir(request.param)
 
     src_file1 = src_dir.join(FILE0)
