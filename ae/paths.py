@@ -196,7 +196,7 @@ from ae.base import app_name_guess, env_str, os_platform                        
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile     # type: ignore
 
 
-__version__ = '0.1.19'
+__version__ = '0.2.19'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
