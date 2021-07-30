@@ -196,7 +196,7 @@ from ae.base import app_name_guess, env_str, os_platform                        
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile     # type: ignore
 
 
-__version__ = '0.2.19'
+__version__ = '0.2.20'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
@@ -303,18 +303,17 @@ move_file = shutil.move
 """ alias for :func:`shutil.move` (see also :func:`~ae.paths.move_tree`). """
 
 
-def move_files(src_folder: str, dst_folder: str, overwrite: bool = False) -> List[str]:
-    """ move files from src_folder into optionally created dst_folder, optionally overwriting destination files.
+def copy_files(src_folder: str, dst_folder: str, overwrite: bool = False, copier: Callable = copy_file) -> List[str]:
+    """ copy files from src_folder into optionally created dst_folder, optionally overwriting destination files.
 
-    :param src_folder:          path to source folder/directory where the files get moved from. placeholders in
+    :param src_folder:          path to source folder/directory where the files get copied from. placeholders in
                                 :data:`PATH_PLACEHOLDERS` will be recognized and substituted.
-                                please note that the source folders itself will neither be moved nor removed (but will
-                                be empty after the operation finished).
-    :param dst_folder:          path to destination folder/directory where the files get moved to. all placeholders in
+    :param dst_folder:          path to destination folder/directory where the files get copied to. all placeholders in
                                 :data:`PATH_PLACEHOLDERS` are recognized and will be substituted.
     :param overwrite:           pass True to overwrite existing files in the destination folder/directory. on False the
-                                files will only get moved if they not exist in the destination.
-    :return:                    list of moved files, with their destination path.
+                                files will only get copied if they not exist in the destination.
+    :param copier:              copy/move function with src_file and dst_file parameters, returning file path/name.
+    :return:                    list of copied files, with their destination path.
     """
     src_folder = norm_path(src_folder)
     dst_folder = norm_path(dst_folder)
@@ -329,9 +328,25 @@ def move_files(src_folder: str, dst_folder: str, overwrite: bool = False) -> Lis
                     dst_sub_dir = os.path.dirname(dst_file)
                     if not os.path.exists(dst_sub_dir):
                         os.makedirs(dst_sub_dir)
-                    updated.append(move_file(src_file, dst_file))
+                    updated.append(copier(src_file, dst_file))
 
     return updated
+
+
+def move_files(src_folder: str, dst_folder: str, overwrite: bool = False) -> List[str]:
+    """ move files from src_folder into optionally created dst_folder, optionally overwriting destination files.
+
+    :param src_folder:          path to source folder/directory where the files get moved from. placeholders in
+                                :data:`PATH_PLACEHOLDERS` will be recognized and substituted.
+                                please note that the source folders itself will neither be moved nor removed (but will
+                                be empty after the operation finished).
+    :param dst_folder:          path to destination folder/directory where the files get moved to. all placeholders in
+                                :data:`PATH_PLACEHOLDERS` are recognized and will be substituted.
+    :param overwrite:           pass True to overwrite existing files in the destination folder/directory. on False the
+                                files will only get moved if they not exist in the destination.
+    :return:                    list of moved files, with their destination path.
+    """
+    return copy_files(src_folder, dst_folder, overwrite=overwrite, copier=move_file)
 
 
 move_tree = shutil.move

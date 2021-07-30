@@ -10,7 +10,7 @@ from unittest.mock import patch
 from ae.base import CFG_EXT, INI_EXT, app_name_guess, os_platform
 from ae.files import read_file_text, write_file_text, CachedFile, RegisteredFile
 from ae.paths import (PATH_PLACEHOLDERS,
-                      add_common_storage_paths, app_data_path, app_docs_path, move_files,
+                      add_common_storage_paths, app_data_path, app_docs_path, copy_files, move_files,
                       norm_path, path_files, path_folders, path_items, path_name, placeholder_key, placeholder_path,
                       series_file_name, user_data_path, user_docs_path, Collector, FilesRegister)
 
@@ -233,6 +233,49 @@ def files_to_move(request, tmpdir):
     # tmpdir/dst_dir1 will be removed automatically by pytest - leaving the last three temporary directories
     # .. see https://docs.pytest.org/en/latest/tmpdir.html#the-default-base-temporary-directory
     # shutil.rmtree(tmpdir)
+
+
+class TestCopyFiles:
+    def test_copy_to_parent_dir(self, files_to_move):
+        src_dir = os.path.dirname(files_to_move[0])
+        dst_dir = os.path.join(src_dir, "..")
+        for src_file_path in files_to_move:
+            assert os.path.exists(src_file_path)
+            assert not os.path.exists(os.path.join(dst_dir, os.path.relpath(src_file_path, src_dir)))
+        tst_overwrite = (OVERWRITES_SRC_FOLDER_NAME in src_dir)
+
+        copy_files(src_dir, dst_dir, overwrite=tst_overwrite)
+
+        if not tst_overwrite:
+            for src_file_path in files_to_move:
+                assert os.path.exists(src_file_path)
+                assert os.path.exists(os.path.join(dst_dir, os.path.relpath(src_file_path, src_dir)))
+
+    def test_blocked_copy_to_parent_dir(self, files_to_move):
+        src_dir = os.path.dirname(files_to_move[0])
+        dst_dir = os.path.join(src_dir, "..")
+        dst_block_file = os.path.join(dst_dir, FILE0)
+        write_file_text(OLD_CONTENT0, dst_block_file)
+        assert os.path.exists(dst_block_file)
+        for src_file_path in files_to_move:
+            assert os.path.exists(src_file_path)
+            dst_file = os.path.join(dst_dir, os.path.relpath(src_file_path, src_dir))
+            assert dst_file == dst_block_file or not os.path.exists(dst_file)
+        tst_overwrite = (OVERWRITES_SRC_FOLDER_NAME in src_dir)
+
+        copy_files(src_dir, dst_dir, overwrite=tst_overwrite)
+
+        if not tst_overwrite:
+            assert os.path.exists(files_to_move[0])
+            assert read_file_text(files_to_move[0]) == CONTENT0
+            dst_file = os.path.join(dst_dir, os.path.relpath(files_to_move[0], src_dir))
+            assert os.path.exists(dst_file)
+            assert read_file_text(dst_file) == OLD_CONTENT0
+
+            assert os.path.exists(files_to_move[1])
+            dst_file = os.path.join(dst_dir, os.path.relpath(files_to_move[1], src_dir))
+            assert os.path.exists(dst_file)
+            assert read_file_text(dst_file) == CONTENT1
 
 
 class TestMoveFiles:
@@ -905,14 +948,17 @@ class TestFilesRegister:
         assert all(isinstance(_, CachedFile) for _ in files)
 
     def test_call_find_file_redirect(self, files_to_test):
+        assert file_name in files_to_test[1]
         fr = FilesRegister(file_root)
         assert fr(file_name, properties=file_properties) == fr.find_file(file_name, properties=file_properties)
 
     def test_find_file_by_name(self, files_to_test):
+        assert file_name in files_to_test[1]
         fr = FilesRegister(os.path.join(file_root, '**'))
         assert fr.find_file(file_name).stem == file_name
 
     def test_find_file_by_properties(self, files_to_test):
+        assert file_name in files_to_test[1]
         fr = FilesRegister(os.path.join(file_root, '**'))
         ff = fr.find_file(file_name, properties=file_properties)
         assert ff
@@ -920,6 +966,7 @@ class TestFilesRegister:
         assert ff.properties == file_properties
 
     def test_find_file_by_property_matcher(self, files_to_test):
+        assert file_name in files_to_test[1]
         fr = FilesRegister(os.path.join(file_root, '**'))
         ff = fr.find_file(file_name, property_matcher=property_matcher_mock)
         assert ff
@@ -927,6 +974,7 @@ class TestFilesRegister:
         assert ff.properties == file_properties
 
     def test_find_file_by_property_matcher_and_file_sorter(self, files_to_test):
+        assert file_name in files_to_test[1]
         fr = FilesRegister(os.path.join(file_root, '**'))
         ff = fr.find_file(file_name, properties=file_properties, file_sorter=file_sorter_mock)
         assert ff
@@ -934,6 +982,7 @@ class TestFilesRegister:
         assert ff.properties == file_properties
 
     def test_find_file_by_file_sorter(self, files_to_test):
+        assert file_name in files_to_test[1]
         fr = FilesRegister(os.path.join(file_root, '**'))
         ff = fr.find_file(file_name, file_sorter=file_sorter_mock)
         assert ff
