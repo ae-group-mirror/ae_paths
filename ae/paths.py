@@ -196,7 +196,7 @@ from ae.base import app_name_guess, env_str, os_platform                        
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile     # type: ignore
 
 
-__version__ = '0.2.20'
+__version__ = '0.2.21'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
@@ -222,7 +222,7 @@ def add_common_storage_paths():
     * `music`: user music directory.
     * `pictures`: user pictures directory.
     * `root`: root directory of the operating system partition.
-    * `sdcard`: SD card root directory.
+    * `sdcard`: SD card root directory (only available in Android if sdcard is inserted).
     * `videos`: user videos directory.
 
     additionally storage paths that are only available on certain OS (inspired by the method `get_drives`, implemented
@@ -238,7 +238,9 @@ def add_common_storage_paths():
     for attr in dir(storagepath):
         if attr.startswith('get_') and attr.endswith('_dir'):
             try:
-                PATH_PLACEHOLDERS[attr[4:-4]] = getattr(storagepath, attr)()
+                path = getattr(storagepath, attr)()
+                if isinstance(path, str):  # e.g. get_sdcard_dir() returns None in Android device w/o inserted sdcard
+                    PATH_PLACEHOLDERS[attr[4:-4]] = path
             except (AttributeError, NotImplementedError, FileNotFoundError, Exception):
                 pass
 
