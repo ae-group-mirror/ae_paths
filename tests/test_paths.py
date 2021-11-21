@@ -7,11 +7,11 @@ import pathlib
 import shutil
 from unittest.mock import patch
 
-from ae.base import CFG_EXT, INI_EXT, app_name_guess, os_platform
+from ae.base import CFG_EXT, INI_EXT, TESTS_FOLDER, app_name_guess, os_platform, write_file
 from ae.files import read_file_text, write_file_text, CachedFile, RegisteredFile
 from ae.paths import (PATH_PLACEHOLDERS,
                       add_common_storage_paths, app_data_path, app_docs_path, copy_files, move_files,
-                      norm_path, path_files, path_folders, path_items, path_name, placeholder_key, placeholder_path,
+                      normalize, path_files, path_folders, path_items, path_name, placeholder_key, placeholder_path,
                       series_file_name, user_data_path, user_docs_path, Collector, FilesRegister)
 
 
@@ -55,19 +55,60 @@ class TestPlaceholders:
         if os_platform == 'android':
             assert 'sdcard' in PATH_PLACEHOLDERS
 
-    def test_norm_path(self):
-        f_name = "norm_file.tst"
-        assert norm_path(f_name) == f_name
+    def test_normalize(self):
+        f_path = "norm_file.tst"
+        assert normalize(f_path, make_absolute=False, remove_dots=False, resolve_sym_links=False) == f_path
+        assert normalize(f_path, make_absolute=False, remove_dots=False) == os.path.realpath(f_path)
+        assert normalize(f_path, make_absolute=False, resolve_sym_links=False) == f_path
+        assert normalize(f_path, make_absolute=False) == os.path.realpath(f_path)
+        assert normalize(f_path, remove_dots=False, resolve_sym_links=False) == os.path.abspath(f_path)
+        assert normalize(f_path, remove_dots=False) == os.path.realpath(f_path)
+        assert normalize(f_path, resolve_sym_links=False) == os.path.abspath(f_path)
+        assert normalize(f_path) == os.path.realpath(f_path)
 
-        file_path = "tests/norm_test.tst"
-        assert norm_path(file_path) == file_path
+        f_path = f"{TESTS_FOLDER}/norm_test.tst"
+        assert normalize(f_path, make_absolute=False, remove_dots=False, resolve_sym_links=False) == f_path
+        assert normalize(f_path, make_absolute=False, remove_dots=False) == os.path.realpath(f_path)
+        assert normalize(f_path, make_absolute=False, resolve_sym_links=False) == f_path
+        assert normalize(f_path, make_absolute=False) == os.path.realpath(f_path)
+        assert normalize(f_path, remove_dots=False, resolve_sym_links=False) == os.path.abspath(f_path)
+        assert normalize(f_path, remove_dots=False) == os.path.realpath(f_path)
+        assert normalize(f_path, resolve_sym_links=False) == os.path.abspath(f_path)
+        assert normalize(f_path) == os.path.realpath(f_path)
+        assert normalize(f_path, remove_base_path=TESTS_FOLDER) == "norm_test.tst"
+        assert normalize(f_path, remove_base_path=TESTS_FOLDER) == os.path.relpath(f_path, TESTS_FOLDER)
+        assert normalize(f_path, remove_base_path='_not_existing_') == f"../{TESTS_FOLDER}/" \
+                                                                       f"{os.path.relpath(f_path, TESTS_FOLDER)}"
+        assert f"../{TESTS_FOLDER}/{normalize(f_path, remove_base_path=TESTS_FOLDER)}" == os.path.relpath(
+            f_path, "_not_exists_folder")
 
-        file_path = "~/norm_path_test.tst"
-        assert len(norm_path(file_path)) > len(file_path)
-        assert norm_path(file_path).endswith(file_path[1:])
+        f_path = f"_not_existing_folder/norm_test.tst"
+        assert normalize(f_path, make_absolute=False, remove_dots=False, resolve_sym_links=False) == f_path
+        assert normalize(f_path, make_absolute=False, remove_dots=False) == os.path.realpath(f_path)
+        assert normalize(f_path, make_absolute=False, resolve_sym_links=False) == f_path
+        assert normalize(f_path, make_absolute=False) == os.path.realpath(f_path)
+        assert normalize(f_path, remove_dots=False, resolve_sym_links=False) == os.path.abspath(f_path)
+        assert normalize(f_path, remove_dots=False) == os.path.realpath(f_path)
+        assert normalize(f_path, resolve_sym_links=False) == os.path.abspath(f_path)
+        assert normalize(f_path) == os.path.realpath(f_path)
+        assert normalize(f_path, remove_base_path=TESTS_FOLDER) == f"../{f_path}"
+        assert normalize(f_path, remove_base_path=TESTS_FOLDER) == os.path.relpath(f_path, TESTS_FOLDER)
+        assert normalize(f_path, remove_base_path='_not_existing_') == os.path.relpath(f_path, TESTS_FOLDER)
+        assert normalize(f_path, remove_base_path=TESTS_FOLDER) == os.path.relpath(
+            f_path, "_not_exists_folder")
 
-        file_path = ""
-        assert len(norm_path(file_path)) == 0
+        f_path = "~/normalize_test.tst"
+        assert len(normalize(f_path)) > len(f_path)
+        assert normalize(f_path, make_absolute=False, remove_dots=False, resolve_sym_links=False).endswith(f_path[1:])
+        assert normalize(f_path).endswith(f_path[1:])
+
+        f_path = "."
+        assert normalize(f_path, make_absolute=False, remove_dots=False, resolve_sym_links=False) == "."
+        assert len(normalize(f_path)) == len(os.getcwd())
+
+        f_path = ""
+        assert normalize(f_path, make_absolute=False, remove_dots=False, resolve_sym_links=False) == "."
+        assert len(normalize(f_path)) == len(os.getcwd())
 
     def test_path_name(self):
         assert path_name("") == ""
@@ -96,7 +137,7 @@ class TestPlaceholders:
         assert placeholder_path(f_name) == f_name
         assert placeholder_path(file_path) == "{cwd}" + os.path.sep + f_name
         assert placeholder_path(file_path).format(**PATH_PLACEHOLDERS) == file_path
-        assert norm_path(placeholder_path(file_path)) == file_path
+        assert normalize(placeholder_path(file_path)) == file_path
 
 
 class TestAppPaths:
@@ -202,15 +243,13 @@ def files_to_test():
     """ provide test file with properties. """
     fn = file_root
     os.mkdir(fn)
-    with open(file_without_properties, 'w') as fp:
-        fp.write(CONTENT0)
+    write_file(file_without_properties, CONTENT0)
 
     for name, value in file_properties.items():
         fn = os.path.join(fn, name + '_' + str(value))
         os.mkdir(fn)
     fn = os.path.join(fn, file_name + file_ext)
-    with open(fn, 'w') as fp:
-        fp.write(CONTENT0)
+    write_file(fn, CONTENT0)
 
     yield file_without_properties, fn
 
@@ -364,7 +403,7 @@ class TestMoveFiles:
         src_dir = os.path.dirname(files_to_move[0])
         dst_dir = user_data_path()
 
-        moved = list()
+        moved = []
         try:
             moved += move_files(src_dir, "{usr}")
 
@@ -453,7 +492,7 @@ class TestPathFiles:
             """ callable used for the file_class argument of path_files. """
             added.append((f_name, kwargs))
             return f_name
-        added = list()
+        added = []
         found = path_files("**.py", file_class=add_file, a=1, b=2)
 
         assert len(found) == len(added)
@@ -469,7 +508,7 @@ class TestPathFiles:
                 self.file_name = f_name
                 self.stem = os.path.splitext(f_name)[0]
                 added.append((f_name, kwargs))
-        added = list()
+        added = []
         found = path_files("*.py", file_class=FileClass, a=3, b=6)
 
         assert len(found) == len(added)
@@ -564,7 +603,7 @@ class TestPathFolders:
             """ callable used for the file_class argument of path_folders. """
             added.append((folder_name, kwargs))
             return folder_name
-        added = list()
+        added = []
         found = path_folders("tests", folder_class=add_folder, a=1, b=2)
 
         assert len(found) == len(added)
@@ -580,7 +619,7 @@ class TestPathFolders:
                 self.folder_name = f_name
                 self.stem = os.path.splitext(f_name)[0]
                 added.append((f_name, kwargs))
-        added = list()
+        added = []
         found = path_folders("tests", folder_class=FileClass, a=3, b=6)
 
         assert len(found) == len(added)
@@ -677,7 +716,7 @@ class TestPathItems:
             """ callable used for the file_class argument of path_files. """
             added.append((f_name, kwargs))
             return f_name
-        added = list()
+        added = []
         found = path_items("**.py", creator=add_file, a=1, b=2)
 
         assert len(found) == len(added)
@@ -693,7 +732,7 @@ class TestPathItems:
                 self.file_name = f_name
                 self.stem = os.path.splitext(f_name)[0]
                 added.append((f_name, kwargs))
-        added = list()
+        added = []
         found = path_items("*.py", creator=FileClass, a=3, b=6)
 
         assert len(found) == len(added)
@@ -911,7 +950,7 @@ class TestFilesRegister:
         assert all(_.path in (wop, wip) for _ in files)
         assert all(_.stem == file_name for _ in files)
         assert all(_.ext == file_ext for _ in files)
-        assert all(_.properties in (dict(), file_properties) for _ in files)
+        assert all(_.properties in ({}, file_properties) for _ in files)
 
     def test_add_path_redirect(self, files_to_test):
         wop, wip = files_to_test
@@ -925,7 +964,7 @@ class TestFilesRegister:
         assert all(_.path in (wop, wip) for _ in files)
         assert all(_.stem == file_name for _ in files)
         assert all(_.ext == file_ext for _ in files)
-        assert all(_.properties in (dict(), file_properties) for _ in files)
+        assert all(_.properties in ({}, file_properties) for _ in files)
 
         old_len = len(fr)
         assert 'test_files' not in fr
@@ -943,7 +982,7 @@ class TestFilesRegister:
         assert all(_.path in (wop, wip) for _ in files)
         assert all(_.stem == file_name for _ in files)
         assert all(_.ext == file_ext for _ in files)
-        assert all(_.properties in (dict(), file_properties) for _ in files)
+        assert all(_.properties in ({}, file_properties) for _ in files)
 
         assert all(isinstance(_, CachedFile) for _ in files)
 
@@ -987,7 +1026,7 @@ class TestFilesRegister:
         ff = fr.find_file(file_name, file_sorter=file_sorter_mock)
         assert ff
         assert ff.stem == file_name
-        assert ff.properties == dict()      # finds the one without properties because int-default==0
+        assert ff.properties == {}      # finds the one without properties because int-default==0
 
     def test_find_file_with_default_property_matcher(self):
         fr = FilesRegister(property_matcher=property_matcher_mock)

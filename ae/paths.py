@@ -40,7 +40,7 @@ these system paths together with additional generic paths like e.g. the current 
 parts (like e.g. the user or application name) are provided as `path placeholders`, which are stored within the
 :data:`PATH_PLACEHOLDERS` dict.
 
-the helper function :func:`norm_path` converts path strings containing path placeholders into regular path strings.
+the helper function :func:`normalize` converts path strings containing path placeholders into regular path strings.
 :func:`path_name` and :func:`placeholder_paths` are converting regular path strings or parts of it into path
 placeholders.
 
@@ -192,11 +192,11 @@ import string
 import sys
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Type, Union
 
-from ae.base import app_name_guess, env_str, os_platform                        # type: ignore
-from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile     # type: ignore
+from ae.base import app_name_guess, env_str, norm_path, os_platform                         # type: ignore
+from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile                 # type: ignore
 
 
-__version__ = '0.2.21'
+__version__ = '0.2.22'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
@@ -317,15 +317,15 @@ def copy_files(src_folder: str, dst_folder: str, overwrite: bool = False, copier
     :param copier:              copy/move function with src_file and dst_file parameters, returning file path/name.
     :return:                    list of copied files, with their destination path.
     """
-    src_folder = norm_path(src_folder)
-    dst_folder = norm_path(dst_folder)
+    src_folder = normalize(src_folder, make_absolute=False, remove_dots=False, resolve_sym_links=False)
+    dst_folder = normalize(dst_folder, make_absolute=False, remove_dots=False, resolve_sym_links=False)
 
-    updated = list()
+    updated = []
 
     if os.path.exists(src_folder):
         for src_file in glob.glob(os.path.join(src_folder, '**'), recursive=True):
             if os.path.isfile(src_file):
-                dst_file = os.path.abspath(os.path.join(dst_folder, os.path.relpath(src_file, src_folder)))
+                dst_file = norm_path(os.path.join(dst_folder, os.path.relpath(src_file, src_folder)))
                 if overwrite or not os.path.exists(dst_file):
                     dst_sub_dir = os.path.dirname(dst_file)
                     if not os.path.exists(dst_sub_dir):
@@ -355,16 +355,31 @@ move_tree = shutil.move
 """ another alias for :func:`shutil.move` (see also :func:`~ae.paths.move_file`). """
 
 
-def norm_path(path: str) -> str:
+def normalize(path: str, make_absolute: bool = True, remove_dots: bool = True, resolve_sym_links: bool = True,
+              remove_base_path: str = "") -> str:
     """ normalize/transform path replacing `PATH_PLACEHOLDERS` and the tilde character (for home folder).
 
     :param path:                path string to normalize/transform.
-    :return:                    normalized path string.
+    :param make_absolute:       pass False to not convert path to an absolute path.
+    :param remove_base_path:    pass a valid base path to return a relative path, even if the argument values of
+                                :paramref:`~normalize.make_absolute` or :paramref:`~normalize.resolve_sym_links` are
+                                `True`.
+    :param remove_dots:         pass False to not replace/remove the `.` and `..` placeholders.
+    :param resolve_sym_links:   pass False to not resolve symbolic links, passing True implies a `True` value also for
+                                the :paramref:`~normalize.make_absolute` argument.
+    :return:                    normalized path string: absolute if :paramref:`~normalize.remove_base_path` is empty and
+                                either :paramref:`~normalize.make_absolute` or :paramref:`~normalize.resolve_sym_links`
+                                is `True`; relative if :paramref:`~normalize.remove_base_path` is a base path of
+                                :paramref:`~normalize.path` or if :paramref:`~normalize.path` got passed as relative
+                                path and neither :paramref:`~normalize.make_absolute` nor
+                                :paramref:`~normalize.resolve_sym_links` is `True`.
     """
-    path = path.format(**PATH_PLACEHOLDERS)
-    if path[0:1] == "~":
-        path = os.path.expanduser(path)
-    return path
+    return norm_path(path.format(**PATH_PLACEHOLDERS),
+                     make_absolute=make_absolute,
+                     remove_dots=remove_dots,
+                     resolve_sym_links=resolve_sym_links,
+                     remove_base_path=remove_base_path,
+                     )
 
 
 def path_files(file_mask: str, recursive: bool = True,
@@ -419,11 +434,11 @@ def path_items(item_mask: str, recursive: bool = True, selector: Callable[[str],
     :param creator_kwargs:      additional/optional kwargs passed onto the used item_class apart from the item name.
     :return:                    list of found and selected items of the item class (:paramref:`~path_items.item_class`).
     """
-    item_mask = norm_path(item_mask)
+    item_mask = normalize(item_mask, make_absolute=False, remove_dots=False, resolve_sym_links=False)
     # if recursive and '*' not in item_mask and '?' not in item_mask:
     #    item_mask = os.path.join(item_mask, '**')
 
-    items = list()
+    items = []
     for part in glob.glob(item_mask, recursive=recursive):
         if selector(part):
             items.append(creator(part, **creator_kwargs))
@@ -438,9 +453,9 @@ def path_name(path: str) -> str:
     :return:                    name (respectively dict key in :data:`PATH_PLACEHOLDERS`) of the found path
                                 or empty string if not found.
     """
-    search_path = norm_path(path)
+    search_path = normalize(path, make_absolute=False, remove_dots=False, resolve_sym_links=False)
     for name, registered_path in PATH_PLACEHOLDERS.items():
-        if norm_path(registered_path) == search_path:
+        if normalize(registered_path, make_absolute=False, remove_dots=False, resolve_sym_links=False) == search_path:
             return name
     return ""
 
@@ -554,7 +569,8 @@ def user_docs_path() -> str:
     return docs_path
 
 
-PATH_PLACEHOLDERS = dict()   #: placeholders of user-, os- and app-specific system paths and file name parts
+# noinspection PyDictCreation
+PATH_PLACEHOLDERS = {}   #: placeholders of user-, os- and app-specific system paths and file name parts
 
 PATH_PLACEHOLDERS['app_name'] = app_name_guess()
 
@@ -579,12 +595,12 @@ class Collector:
         """
         self._path_scanner = path_scanner
 
-        self.paths: List[str] = list()                  #: list of found/collected folder names
-        self.files: List[str] = list()                  #: list of found/collected file names
-        self.selected: List[str] = list()               #: list of found/collected file/folder item names
-        self.failed = 0                                 #: number of not found select-combinations
-        self.prefix_failed: Dict[str, int] = dict()     #: number of not found select-combinations for each prefix
-        self.suffix_failed: Dict[str, int] = dict()     #: number of not found select-combinations for each suffix
+        self.paths: List[str] = []                  #: list of found/collected folder names
+        self.files: List[str] = []                  #: list of found/collected file names
+        self.selected: List[str] = []               #: list of found/collected file/folder item names
+        self.failed = 0                             #: number of not found select-combinations
+        self.prefix_failed: Dict[str, int] = {}     #: number of not found select-combinations for each prefix
+        self.suffix_failed: Dict[str, int] = {}     #: number of not found select-combinations for each suffix
 
         self.placeholders = PATH_PLACEHOLDERS.copy()    #: path part placeholders of this Collector instance
         self.placeholders.update(placeholders)
@@ -740,7 +756,7 @@ class FilesRegister(dict):
         :return:                list of paths of the added files.
         """
         increment = -1 if first_index < 0 else 1
-        added_file_paths = list()
+        added_file_paths = []
         for file_obj in files:
             self.add_file(file_obj, first_index=first_index)
             added_file_paths.append(str(file_obj))
@@ -768,7 +784,7 @@ class FilesRegister(dict):
                                 :class:`CachedFile` (instead of the default: :class:`RegisteredFile`).
         :return:                list of paths of the added files.
         """
-        added_file_paths = list()
+        added_file_paths = []
         for mask in file_path_masks:
             added_file_paths.extend(
                 self.add_files(path_files(mask, recursive=recursive, file_class=file_class, **init_kwargs),
@@ -788,7 +804,7 @@ class FilesRegister(dict):
                                 begin in reversed order).
         :return:                list of paths of the added files.
         """
-        added_file_paths = list()
+        added_file_paths = []
         for files in files_register.values():
             added_file_paths.extend(self.add_files(files, first_index=first_index))
         return added_file_paths
