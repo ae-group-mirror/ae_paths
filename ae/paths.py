@@ -196,7 +196,7 @@ from ae.base import app_name_guess, env_str, norm_path, os_platform             
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile                 # type: ignore
 
 
-__version__ = '0.2.22'
+__version__ = '0.3.22'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
@@ -383,7 +383,6 @@ def normalize(path: str, make_absolute: bool = True, remove_dots: bool = True, r
 
 
 def path_files(file_mask: str, recursive: bool = True,
-               # file_class: Union[Type[Any], Callable[[str, KwArg()], Any]] = str, **file_kwargs) -> List[Any]:
                file_class: Union[Type[Any], Callable] = str, **file_kwargs) -> List[Any]:
     """ determine existing file(s) underneath the folder specified by :paramref:`~path_files.path`.
 
@@ -391,6 +390,7 @@ def path_files(file_mask: str, recursive: bool = True,
                                 specifying the files to collect (by default including the sub-folders).
     :param recursive:           pass False to only collect the given folder (ignoring sub-folders).
     :param file_class:          factory used for the returned list items (see :paramref:`path_items.creator`).
+                                silly mypy does not support Union[Type[Any], Callable[[str, KwArg()], Any]].
     :param file_kwargs:         additional/optional kwargs apart from file name passed onto the used item_class.
     :return:                    list of files of the class specified by :paramref:`~path_files.item_class`.
     """
@@ -398,7 +398,6 @@ def path_files(file_mask: str, recursive: bool = True,
 
 
 def path_folders(folder_mask: str, recursive: bool = True,
-                 # folder_class: Union[Type[Any], Callable[[str, KwArg()], Any]] = str, **folder_kwargs) -> List[Any]:
                  folder_class: Union[Type[Any], Callable] = str, **folder_kwargs) -> List[Any]:
     """ determine existing folder(s) underneath the folder specified by :paramref:`~path_folders.path`.
 
@@ -406,31 +405,32 @@ def path_folders(folder_mask: str, recursive: bool = True,
                                 specifying the folders to collect (by default including the sub-folders).
     :param recursive:           pass False to only collect the given folder (ignoring sub-folders).
     :param folder_class:        class or factory used for the returned list items (see :paramref:`~path_items.creator`).
+                                silly mypy does not support Union[Type[Any], Callable[[str, KwArg()], Any]].
     :param folder_kwargs:       additional/optional kwargs apart from file name passed onto the used item_class.
     :return:                    list of folders of the class specified by :paramref:`~path_folders.item_class`.
     """
     return path_items(folder_mask, recursive=recursive, selector=os.path.isdir, creator=folder_class, **folder_kwargs)
 
 
-def path_items(item_mask: str, recursive: bool = True, selector: Callable[[str], bool] = os.path.exists,
-               # creator: Union[Type[Any], Callable[[str, KwArg()], Any]] = str, **creator_kwargs) -> List[Any]:
+def path_items(item_mask: str, recursive: bool = True, selector: Callable[[str], Any] = str,
                creator: Union[Type[Any], Callable] = str, **creator_kwargs) -> List[Any]:
     """ determine existing file/folder item(s) underneath the folder specified by :paramref:`~path_items.path`.
 
     :param item_mask:           file path mask (with optional glob wildcards and :data:`PATH_PLACEHOLDERS`)
                                 specifying the files/folders to collect (by default including the sub-folders).
     :param recursive:           pass False to only collect within the specified folder (ignoring sub-folders).
-    :param selector:            called with each found file/folder name to check if it has to be added
-                                to the returned list.
+    :param selector:            called with each found file/folder name to check if it has to be added to the returned
+                                list. the default argument (str) results in returning every file/folder found by glob().
     :param creator:             each found file/folder will be passed as argument to this class/callable and the
                                 instance/return-value will be appended as an item to the returned item list.
                                 if not passed then the `str` class will be used, which means that the items
                                 of the returned list will be strings of the file/folder path and name.
-                                if a class, like e.g. :class:`ae.files.CachedFile`, :class:`ae.files.CachedFile`
-                                or :class:`pathlib.Path`, get passed then the items will be instances of this class.
+                                passing a class, like e.g. :class:`ae.files.CachedFile`, :class:`ae.files.CachedFile`
+                                or :class:`pathlib.Path`, will create instances of this class.
                                 alternatively you can pass a callable which will be called on each found file/folder.
                                 in this case the return value of the callable will be inserted in the related
                                 item of the returned list.
+                                silly mypy does not support Union[Type[Any], Callable[[str, KwArg()], Any]].
     :param creator_kwargs:      additional/optional kwargs passed onto the used item_class apart from the item name.
     :return:                    list of found and selected items of the item class (:paramref:`~path_items.item_class`).
     """
@@ -555,7 +555,7 @@ def user_docs_path() -> str:
     :return:                    path string of the user documents folder.
     """
     if os_platform == 'android':            # pragma: no cover
-        from jnius import autoclass         # type: ignore  # pylint: disable=no-name-in-module, import-outside-toplevel
+        from jnius import autoclass         # pylint: disable=no-name-in-module, import-outside-toplevel
         # noinspection PyPep8Naming
         Environment = autoclass('android.os.Environment')  # pylint: disable=invalid-name
         docs_path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS).getAbsolutePath()
@@ -854,4 +854,4 @@ class FilesRegister(dict):
         """
         for _name, files in self.items():
             for idx, file in enumerate(files):
-                files[idx] = file_class(str(file), **init_kwargs)           # type: ignore
+                files[idx] = file_class(str(file), **init_kwargs)
