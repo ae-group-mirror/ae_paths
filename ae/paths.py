@@ -180,7 +180,7 @@ as a shortcut you can alternatively call the object directly (leaving `.find_fil
 
 if the `current_size` variable contains the integer ``150``, then `app_icon_image_path` will result in
 `"resources/size_150/app_icon.png"`. in contrary if the `current_size` variable contains the integer `72`, then
-`app_icon_image_path` will result in `"resources/size_72/app_icon.png"`.
+`app_icon_image_path` will result in `"resources/size_72/app_icon.jpg"`.
 
 for more complex selections you can use callables passed into the :paramref:`~FilesRegister.find_file.property_matcher`
 and :paramref:`~FilesRegister.find_file.file_sorter` arguments of :meth:`~FilesRegister.find_file`.
@@ -196,7 +196,7 @@ from ae.base import app_name_guess, env_str, norm_path, os_platform             
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile                 # type: ignore
 
 
-__version__ = '0.3.22'
+__version__ = '0.3.23'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
