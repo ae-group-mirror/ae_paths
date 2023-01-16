@@ -3,7 +3,7 @@ generic file path helpers
 =========================
 
 this pure python namespace portion is providing generic file paths together with useful helper functions and classes
-that are independent from the operating system. the currently support operating systems are:
+that are independent of the operating system. the currently supported operating systems are:
 
     * android OS
     * iOS
@@ -138,10 +138,10 @@ files can be collected from various places by a single instance of the class :cl
 
     from ae.files import FilesRegister
 
-    fr = FilesRegister('first/path/to/collect')
-    fr.add_paths('second/path/to/collect/files/from')
+    file_reg = FilesRegister('first/path/to/collect')
+    file_reg.add_paths('second/path/to/collect/files/from')
 
-    registered_file = fr.find_file('file_name')
+    registered_file = file_reg.find_file('file_name')
 
 in this example the :class:`FilesRegister` instance collects all files that are existing in any sub-folders underneath
 the two provided paths. then the :meth:`~FilesRegister.find_file` method will return a file object of type
@@ -159,24 +159,24 @@ within the following directory structure::
 
 first create an instance of :class:`FilesRegister` to collect both image files from the `resources` folder::
 
-    fr = FilesRegister('resources')
+    file_reg = FilesRegister('resources')
 
-the resulting object `fr` behaves like a dict object, where the item key is the file base name without extension
+the resulting object `file_reg` behaves like a dict object, where the item key is the file base name without extension
 ('app_icon') and the item value is a list of instances of :class:`~ae.files.RegisteredFile`. both files in the
 resources folder are provided as one dict item::
 
-    assert 'app_icon' in fr
-    assert len(fr) == 1
-    assert len(fr['app_icon']) == 2
-    assert isinstance(fr['app_icon'][0], RegisteredFile)
+    assert 'app_icon' in file_reg
+    assert len(file_reg) == 1
+    assert len(file_reg['app_icon']) == 2
+    assert isinstance(file_reg['app_icon'][0], RegisteredFile)
 
 to select the appropriate image file you can use the :meth:`~FilesRegister.find_file` method::
 
-    app_icon_image_path = fr.find_file('app_icon', dict(size=current_size))
+    app_icon_image_path = file_reg.find_file('app_icon', dict(size=current_size))
 
 as a shortcut you can alternatively call the object directly (leaving `.find_file` away)::
 
-    app_icon_image_path = fr('app_icon', dict(size=current_size))
+    app_icon_image_path = file_reg('app_icon', dict(size=current_size))
 
 if the `current_size` variable contains the integer ``150``, then `app_icon_image_path` will result in
 `"resources/size_150/app_icon.png"`. in contrary if the `current_size` variable contains the integer `72`, then
@@ -196,7 +196,7 @@ from ae.base import app_name_guess, env_str, norm_path, os_platform             
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile                 # type: ignore
 
 
-__version__ = '0.3.23'
+__version__ = '0.3.24'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
@@ -488,7 +488,7 @@ def placeholder_path(path: str) -> str:
 
 
 def series_file_name(file_path: str, digits: int = 2, marker: str = " ", create: bool = False) -> str:
-    """ determine non-existent series file name with an unique series index.
+    """ determine non-existent series file name with a unique series index.
 
     :param file_path:           file path and name (optional with extension).
     :param digits:              number of digits used for the series index.
@@ -729,7 +729,7 @@ class FilesRegister(dict):
         :param file_obj:        either file path string or any object with a `stem` attribute.
         :param first_index:     pass list index -n-1..n-1 to insert :paramref:`~add_file.file_obj` in the name's list.
                                 values greater than n (==len(file_list)) will append the file_obj to the end of the file
-                                object list and values less than n-1 will insert the file_obj to the begin.
+                                object list and values less than n-1 will insert the file_obj to the start of the file.
         """
         name = os.path.splitext(os.path.basename(file_obj))[0] if isinstance(file_obj, str) else file_obj.stem
         if name in self:
@@ -752,7 +752,7 @@ class FilesRegister(dict):
                                 equal to zero. negative values will add the items from :paramref:`~add_files.files` in
                                 reversed order and **after** the item specified by this index value (so passing -1 will
                                 append the items to the end in reversed order, while passing -(n+1) will insert them at
-                                the begin in reversed order).
+                                the beginning in reversed order).
         :return:                list of paths of the added files.
         """
         increment = -1 if first_index < 0 else 1
@@ -776,9 +776,10 @@ class FilesRegister(dict):
                                 or equal to zero. negative values will add the found items in reversed
                                 order and **after** the item specified by this index value (so passing -1 will append
                                 the items to the end in reversed order, while passing -(n+1) will insert them at the
-                                begin in reversed order).
-        :param file_class:      the used file object class (see :data:`FileObject`). each found file object will passed
-                                to the class constructor (callable) and added to the list which is a item of this dict.
+                                beginning in reversed order).
+        :param file_class:      the used file object class (see :data:`FileObject`). each found file object will be
+                                passed to the class constructor (callable) and added to the list which is an item of
+                                this dict.
         :param init_kwargs:     additional/optional kwargs passed onto the used :paramref:`~add_paths.file_class`. pass
                                 e.g. the object_loader to use, if :paramref:`~add_paths.file_class` is
                                 :class:`CachedFile` (instead of the default: :class:`RegisteredFile`).
@@ -801,7 +802,7 @@ class FilesRegister(dict):
                                 or equal to zero. negative values will add the found items in reversed
                                 order and **after** the item specified by this index value (so passing -1 will append
                                 the items to the end in reversed order, while passing -(n+1) will insert them at the
-                                begin in reversed order).
+                                beginning in reversed order).
         :return:                list of paths of the added files.
         """
         added_file_paths = []
@@ -846,8 +847,8 @@ class FilesRegister(dict):
         """ re-instantiate all name's file registers items to instances of the class :paramref:`~reclassify.file_class`.
 
         :param file_class:      the new file object class (see :data:`~ae.files.FileObject`). each found file object
-                                will passed to the class constructor (callable) and the return value will then replace
-                                the file object in the file list.
+                                will be passed to the class constructor (callable) and the return value will then
+                                replace the file object in the file list.
         :param init_kwargs:     additional/optional kwargs passed onto the used file_class. pass e.g. the object_loader
                                 to use, if :paramref:`~reclassify.file_class` is :class:`CachedFile` (the default file
                                 object class).
