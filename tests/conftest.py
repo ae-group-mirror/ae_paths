@@ -1,4 +1,4 @@
-# THIS FILE IS EXCLUSIVELY MAINTAINED by the project aedev.tpl_project V0.3.23
+# THIS FILE IS EXCLUSIVELY MAINTAINED by the project aedev.tpl_project V0.3.25
 # pylint: disable=redefined-outer-name, unused-argument; suppress fixtures conflicts (silly pylint)
 """ fixtures for to test this project """
 import os
@@ -41,7 +41,7 @@ def restore_app_env(sys_argv_app_key_restore):
     # added outer list because unregister does _APP_INSTANCES.pop() calls
     # and added inner list because the .keys() 'generator' object is not reversible
     with app_inst_lock:
-        app_keys = list(reversed(list(_APP_INSTANCES.keys())))
+        app_keys = list(_APP_INSTANCES.keys())[::-1]
         for key in app_keys:
             # copied from ae.enaml_app conftest.py (not needed for apps based on ae.kivy_app)
             app_instance = _APP_INSTANCES[key]
