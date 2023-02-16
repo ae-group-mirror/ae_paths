@@ -917,11 +917,11 @@ class TestFilesRegister:
         fr = FilesRegister()
         files1 = ['tst.a', 'tst.b', 'tst.c']
         fr.add_files(files1, first_index=-1)
-        assert fr['tst'] == list(reversed(files1))
+        assert fr['tst'] == files1[::-1]
 
         files2 = ['tst.1', 'tst.z', 'tst']
         fr.add_files(tuple(files2), first_index=-4)
-        assert fr['tst'] == list(reversed(files1 + files2))
+        assert fr['tst'] == (files1 + files2)[::-1]
 
     def test_add_register(self):
         fr = FilesRegister()
