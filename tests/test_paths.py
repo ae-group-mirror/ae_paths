@@ -12,7 +12,8 @@ from ae.files import read_file_text, write_file_text, CachedFile, RegisteredFile
 from ae.paths import (PATH_PLACEHOLDERS,
                       add_common_storage_paths, app_data_path, app_docs_path, coll_folders, coll_items,
                       copy_files, move_files,
-                      normalize, path_files, path_folders, path_items, path_name, placeholder_key, placeholder_path,
+                      normalize, path_files, path_folders, path_items, path_join, path_name, placeholder_key,
+                      placeholder_path,
                       series_file_name, user_data_path, user_docs_path, Collector, FilesRegister)
 
 
@@ -66,6 +67,31 @@ def file_loader_mock_func(file):
 def file_sorter_mock(file):
     """ file sorter mock. """
     return file.properties.get('int', 0)
+
+
+class TestHelpers:
+    def test_path_join(self):
+        assert path_join('part', 'part2') == os.path.join('part', 'part2')
+        assert path_join('part', '/part2') == os.path.join('part', '/part2')
+        assert path_join('/part', 'part2') == os.path.join('/part', 'part2')
+        assert path_join('', 'part2') == os.path.join('', 'part2')
+
+        assert path_join('part', '') != os.path.join('part', '')
+        assert path_join('part', '') == 'part'  # os.path.join() returns 'part/' in this case
+
+    def test_path_name(self):
+        assert path_name("") == ""
+        assert path_name("/not/a/existing/test/path") == ""
+        assert path_name(".") == ""
+
+        duplicates1 = ('cwd', 'application')
+        duplicates2 = ('doc', 'documents')
+        for name, path in PATH_PLACEHOLDERS.items():
+            if path_name(path) == 'external_storage':
+                assert name == 'external_storage' or path.endswith(name)
+            else:
+                names = duplicates1 if name in duplicates1 else duplicates2 if name in duplicates2 else (name,)
+                assert path_name(path) in names
 
 
 class TestPlaceholders:
@@ -140,20 +166,6 @@ class TestPlaceholders:
         f_path = ""
         assert normalize(f_path, make_absolute=False, remove_dots=False, resolve_sym_links=False) == "."
         assert len(normalize(f_path)) == len(os.getcwd())
-
-    def test_path_name(self):
-        assert path_name("") == ""
-        assert path_name("/not/a/existing/test/path") == ""
-        assert path_name(".") == ""
-
-        duplicates1 = ('cwd', 'application')
-        duplicates2 = ('doc', 'documents')
-        for name, path in PATH_PLACEHOLDERS.items():
-            if path_name(path) == 'external_storage':
-                assert name == 'external_storage' or path.endswith(name)
-            else:
-                names = duplicates1 if name in duplicates1 else duplicates2 if name in duplicates2 else (name, )
-                assert path_name(path) in names
 
     def test_placeholder_key(self):
         f_name = "test.tst"
