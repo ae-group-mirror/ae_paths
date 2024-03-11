@@ -10,7 +10,8 @@ from unittest.mock import patch
 from ae.base import CFG_EXT, INI_EXT, TESTS_FOLDER, app_name_guess, os_platform, write_file
 from ae.files import read_file_text, write_file_text, CachedFile, RegisteredFile
 from ae.paths import (PATH_PLACEHOLDERS,
-                      add_common_storage_paths, app_data_path, app_docs_path, copy_files, move_files,
+                      add_common_storage_paths, app_data_path, app_docs_path, coll_folders, coll_items,
+                      copy_files, move_files,
                       normalize, path_files, path_folders, path_items, path_name, placeholder_key, placeholder_path,
                       series_file_name, user_data_path, user_docs_path, Collector, FilesRegister)
 
@@ -20,6 +21,36 @@ file_name = 'tst_file'
 file_ext = '.xy'
 file_without_properties = os.path.join(file_root, file_name + file_ext)
 file_properties = {'int': 72, 'float': 1.5, 'str': 'value'}
+
+root_files = ['setup.py']
+mod_files = ['ae/paths.py']
+tst_paths = ['tests']
+tst_files = ['tests/conftest.py', 'tests/test_paths.py']
+tst_sub_folder = 'tests/sub_dir'
+tst_sub_py_files1 = [f'{tst_sub_folder}/tst_sub_file.py']
+tst_sub_files1 = tst_sub_py_files1 + [f'{tst_sub_folder}/tst_sub_wo_extension']
+tst_sub_sub_folder = f'{tst_sub_folder}/sub_dir2'
+tst_sub_py_files2 = [f'{tst_sub_sub_folder}/tst_sub_sub_file.py']
+tst_sub_files2 = tst_sub_py_files2 + [f'{tst_sub_sub_folder}/tst_sub_sub_wo_extension']
+tst_sub_py_files = sorted([_ for _ in tst_sub_files1 + tst_sub_files2 if os.path.splitext(_)[1] == '.py'])
+tst_all_py_files = sorted(root_files + mod_files + tst_files + tst_sub_py_files)
+
+@pytest.fixture
+def test_sub_files():
+    """ provide deep folder test files with properties. """
+    files = []
+    os.mkdir(tst_sub_folder)
+    for fn in tst_sub_files1:
+        write_file(fn, f"file_content of sub {fn}")
+        files.append(fn)
+    os.mkdir(tst_sub_sub_folder)
+    for fn in tst_sub_files2:
+        write_file(fn, f"file_content of sub sub {fn}")
+        files.append(fn)
+
+    yield files
+
+    shutil.rmtree(tst_sub_folder)
 
 
 def property_matcher_mock(file):
@@ -441,26 +472,26 @@ class TestPathFiles:
         assert path_files("tests/test_paths.py") == ["tests/test_paths.py"]
 
     def test_non_recursive(self):
-        assert path_files("setup.py", recursive=False) == ["setup.py"]
-        assert path_files("ae/paths.py", recursive=False) == ["ae/paths.py"]
-        assert path_files("tests/test_paths.py", recursive=False) == ["tests/test_paths.py"]
+        assert path_files("setup.py") == ["setup.py"]
+        assert path_files("ae/paths.py") == ["ae/paths.py"]
+        assert path_files("tests/test_paths.py") == ["tests/test_paths.py"]
 
-        assert path_files("../ae_paths", recursive=False) == []
-        assert path_files("../ae_paths/setup.py", recursive=False) == ["../ae_paths/setup.py"]
+        assert path_files("../ae_paths") == []
+        assert path_files("../ae_paths/setup.py") == ["../ae_paths/setup.py"]
 
-        assert path_files(".", recursive=False) == []
-        assert path_files("./setup.py", recursive=False) == ["./setup.py"]
-        assert path_files("./ae/paths.py", recursive=False) == ["./ae/paths.py"]
+        assert path_files(".") == []
+        assert path_files("./setup.py") == ["./setup.py"]
+        assert path_files("./ae/paths.py") == ["./ae/paths.py"]
 
-        assert path_files("ae", recursive=False) == []
-        assert path_files("ae/paths.py", recursive=False) == ["ae/paths.py"]
+        assert path_files("ae") == []
+        assert path_files("ae/paths.py") == ["ae/paths.py"]
 
-        assert path_files("tests", recursive=False) == []
+        assert path_files("tests") == []
         assert path_files("tests/test_paths.py") == ["tests/test_paths.py"]
 
     def test_placeholders(self):
         assert len(path_files("{cwd}")) == len(path_files("."))
-        assert path_files("{cwd}/ae/paths.py", recursive=False)[0].endswith("/ae_paths/ae/paths.py")
+        assert path_files("{cwd}/ae/paths.py")[0].endswith("/ae_paths/ae/paths.py")
 
         assert len(path_files("{cwd}/**/*.py")) == 4    # ...setup.py, ...paths.py, ...test_paths.py, ...conftest.py
         assert all(_.endswith(".py") for _ in path_files("{cwd}/**/*.py"))
@@ -554,26 +585,26 @@ class TestPathFolders:
         assert path_folders("tests/test_paths.py") == []
 
     def test_non_recursive(self):
-        assert path_folders("setup.py", recursive=False) == []
-        assert path_folders("ae/paths.py", recursive=False) == []
-        assert path_folders("tests/test_paths.py", recursive=False) == []
+        assert path_folders("setup.py") == []
+        assert path_folders("ae/paths.py") == []
+        assert path_folders("tests/test_paths.py") == []
 
-        assert path_folders("../ae_paths", recursive=False) == ["../ae_paths"]
-        assert path_folders("../ae_paths/setup.py", recursive=False) == []
+        assert path_folders("../ae_paths") == ["../ae_paths"]
+        assert path_folders("../ae_paths/setup.py") == []
 
-        assert path_folders(".", recursive=False) == ["."]
-        assert path_folders("./setup.py", recursive=False) == []
-        assert path_folders("./ae/paths.py", recursive=False) == []
+        assert path_folders(".") == ["."]
+        assert path_folders("./setup.py") == []
+        assert path_folders("./ae/paths.py") == []
 
-        assert path_folders("ae", recursive=False) == ["ae"]
-        assert path_folders("ae/paths.py", recursive=False) == []
+        assert path_folders("ae") == ["ae"]
+        assert path_folders("ae/paths.py") == []
 
-        assert path_folders("tests", recursive=False) == ["tests"]
+        assert path_folders("tests") == ["tests"]
         assert path_folders("tests/test_paths.py") == []
 
     def test_placeholders(self):
         assert len(path_folders("{cwd}")) == len(path_folders("."))
-        assert path_folders("{cwd}/ae", recursive=False)[0].endswith("/ae_paths/ae")
+        assert path_folders("{cwd}/ae")[0].endswith("/ae_paths/ae")
 
         assert path_folders("{cwd}/**")
         assert any(_.endswith("/ae_paths/ae") for _ in path_folders("{cwd}/**"))
@@ -665,26 +696,26 @@ class TestPathItems:
         assert path_items("tests/test_paths.py") == ["tests/test_paths.py"]
 
     def test_non_recursive(self):
-        assert path_items("setup.py", recursive=False) == ["setup.py"]
-        assert path_items("ae/paths.py", recursive=False) == ["ae/paths.py"]
-        assert path_items("tests/test_paths.py", recursive=False) == ["tests/test_paths.py"]
+        assert path_items("setup.py") == ["setup.py"]
+        assert path_items("ae/paths.py") == ["ae/paths.py"]
+        assert path_items("tests/test_paths.py") == ["tests/test_paths.py"]
 
-        assert path_items("../ae_paths", recursive=False) == ["../ae_paths"]
-        assert path_items("../ae_paths/setup.py", recursive=False) == ["../ae_paths/setup.py"]
+        assert path_items("../ae_paths") == ["../ae_paths"]
+        assert path_items("../ae_paths/setup.py") == ["../ae_paths/setup.py"]
 
-        assert path_items(".", recursive=False) == ["."]
-        assert path_items("./setup.py", recursive=False) == ["./setup.py"]
-        assert path_items("./ae/paths.py", recursive=False) == ["./ae/paths.py"]
+        assert path_items(".") == ["."]
+        assert path_items("./setup.py") == ["./setup.py"]
+        assert path_items("./ae/paths.py") == ["./ae/paths.py"]
 
-        assert path_items("ae", recursive=False) == ["ae"]
-        assert path_items("ae/paths.py", recursive=False) == ["ae/paths.py"]
+        assert path_items("ae") == ["ae"]
+        assert path_items("ae/paths.py") == ["ae/paths.py"]
 
-        assert path_items("tests", recursive=False) == ["tests"]
+        assert path_items("tests") == ["tests"]
         assert path_items("tests/test_paths.py") == ["tests/test_paths.py"]
 
     def test_placeholders(self):
         assert len(path_items("{cwd}")) == len(path_items("."))
-        assert path_items("{cwd}/ae/paths.py", recursive=False)[0].endswith("/ae_paths/ae/paths.py")
+        assert path_items("{cwd}/ae/paths.py")[0].endswith("/ae_paths/ae/paths.py")
 
         assert len(path_items("{cwd}/**/*.py")) == 4    # ...setup.py, ...paths.py, ...test_paths.py, ...conftest.py
         assert all(_.endswith(".py") for _ in path_items("{cwd}/**/*.py"))
@@ -784,90 +815,379 @@ class TestSeriesFileName:
 
 
 class TestCollector:
-    def test_collect_placeholder(self):
+    def test_add_placeholder(self):
         coll = Collector(app="tst_app_path", main_app_name="tst_app_name")
         assert "app" in coll.placeholders
         assert coll.placeholders["app"] == "tst_app_path"
         assert coll.placeholders["main_app_name"] == "tst_app_name"
 
+    def test_collect_simplest(self):
+        coll = Collector()  # item_collector=coll_files is the default argument -> no paths will be collected
+        coll.collect('tests')
+        assert coll.paths == []
+        assert coll.files == []
+
+        coll.collect('tests/*')
+        assert coll.paths == []
+        assert sorted(coll.files) == sorted(tst_files + ['tests/requirements.txt'])
+
+        coll.collect('tests/*.py')
+        coll.collect('tests/*.txt')
+        assert coll.paths == []
+        assert sorted(coll.files) == sorted(2 * (tst_files + ['tests/requirements.txt']))
+
+    def test_collect_append_tests_files(self):
+        coll = Collector()
+        coll.collect('', append='tests')
+        assert coll.paths == []
+
+        coll.collect('tests', append='*.py')
+        assert coll.paths == []
+        assert sorted(coll.files) == sorted(tst_files)
+
+        coll.collect('', append='tests/*.py')
+        assert coll.paths == []
+        assert sorted(coll.files) == sorted(tst_files * 2)
+
+        coll.collect('tests')
+        assert coll.paths == []
+        assert sorted(coll.files) == sorted(tst_files * 2)
+        assert sorted(coll.selected) == []
+
+        coll.collect('tests', append='')
+        assert coll.paths == []
+        assert sorted(coll.files) == sorted(tst_files * 2)
+        assert sorted(coll.selected) == []
+
+        coll.collect('tests/*.py', append='')
+        assert coll.paths == []
+        assert sorted(coll.files) == sorted(tst_files * 3)
+        assert sorted(coll.selected) == []
+
+        assert coll.failed == 1
+        assert coll.error_message
+        assert dict(coll.prefix_failed) == {'tests': 1}
+        assert dict(coll.suffix_failed) == {'': 1}
+
+    def test_collect_append_tests_folders(self):
+        coll = Collector(item_collector=coll_folders)
+        coll.collect('', append='tests')
+        assert coll.paths == tst_paths
+
+        coll.collect('tests', append='*.py')
+        assert coll.paths == tst_paths
+        assert sorted(coll.files) == []
+
+        coll.collect('', append='tests/*.py')
+        assert coll.paths == tst_paths
+        assert sorted(coll.files) == []
+
+        coll.collect('tests')
+        assert coll.paths == tst_paths * 2
+        assert sorted(coll.files) == []
+        assert sorted(coll.selected) == tst_paths
+
+        coll.collect('tests', append='')
+        assert coll.paths == tst_paths * 3
+        assert sorted(coll.files) == []
+        assert sorted(coll.selected) == tst_paths
+
+        coll.collect('tests/*.py', append='')
+        assert coll.paths == tst_paths * 3
+        assert sorted(coll.files) == []
+        assert sorted(coll.selected) == tst_paths
+
+        assert coll.failed == 0
+        assert not coll.error_message
+        assert dict(coll.prefix_failed) == {}
+        assert coll.suffix_failed == {}
+
+    def test_collect_append_tests_items(self):
+        coll = Collector(item_collector=coll_items)
+        coll.collect('', append='tests')
+        assert coll.paths == tst_paths
+
+        coll.collect('tests', append='*.py')
+        assert coll.paths == tst_paths
+        assert sorted(coll.files) == sorted(tst_files)
+
+        coll.collect('', append='tests/*.py')
+        assert coll.paths == tst_paths
+        assert sorted(coll.files) == sorted(tst_files * 2)
+
+        coll.collect('tests')
+        assert coll.paths == tst_paths * 2
+        assert sorted(coll.files) == sorted(tst_files * 2)
+        assert sorted(coll.selected) == tst_paths
+
+        coll.collect('tests', append='')
+        assert coll.paths == tst_paths * 3
+        assert sorted(coll.files) == sorted(tst_files * 2)
+        assert sorted(coll.selected) == tst_paths
+
+        coll.collect('tests/*.py', append='')
+        assert coll.paths == tst_paths * 3
+        assert sorted(coll.files) == sorted(tst_files * 3)
+        assert sorted(coll.selected) == tst_paths
+
+        assert coll.failed == 0
+        assert not coll.error_message
+        assert dict(coll.prefix_failed) == {}
+        assert coll.suffix_failed == {}
+
+    def test_collect_select_tests_files(self):
+        coll = Collector()      # item_collector=coll_files is the default argument
+        coll.collect('', select='tests')
+        assert coll.paths == []
+        assert sorted(coll.selected) == []
+
+        coll.collect('tests', select='*.py')
+        assert coll.paths == []
+        assert sorted(coll.files) == tst_files
+        assert sorted(coll.selected) == tst_files
+
+        coll.collect('', select='tests/*.py')
+        assert coll.paths == []
+        assert sorted(coll.files) == sorted(tst_files * 2)
+        assert sorted(coll.selected) == sorted(tst_files * 2)
+
+        coll.collect('tests', select='')
+        assert coll.paths == []
+        assert sorted(coll.files) == sorted(tst_files * 2)
+        assert sorted(coll.selected) == sorted(tst_files * 2)
+
+        coll.collect('tests/*.py')      # collect select kwarg defaults to ''
+        assert coll.paths == []
+        assert sorted(coll.files) == sorted(tst_files * 3)
+        assert sorted(coll.selected) == sorted(tst_files * 3)
+
+        assert coll.failed == 2
+        assert coll.error_message
+        assert dict(coll.prefix_failed) == {'': 1, 'tests': 1}
+        assert dict(coll.suffix_failed) == {'': 1, 'tests': 1}
+
+    def test_collect_select_tests_folders(self):
+        coll = Collector(item_collector=coll_folders)
+        coll.collect('', select='tests')
+        assert coll.paths == tst_paths
+        assert sorted(coll.selected) == tst_paths
+
+        coll.collect('tests', select='*.py')
+        assert coll.paths == tst_paths
+        assert sorted(coll.files) == []
+        assert sorted(coll.selected) == ['tests']
+
+        coll.collect('', select='tests/*.py')
+        assert coll.paths == tst_paths
+        assert sorted(coll.files) == []
+        assert sorted(coll.selected) == sorted(tst_paths)
+
+        coll.collect('tests', select='')
+        assert coll.paths == tst_paths * 2
+        assert sorted(coll.files) == []
+        assert sorted(coll.selected) == sorted(tst_paths * 2)
+
+        coll.collect('tests/*.py')      # collect select kwarg defaults to ''
+        assert coll.paths == tst_paths * 2
+        assert sorted(coll.files) == []
+        assert sorted(coll.selected) == sorted(tst_paths * 2)
+
+        assert coll.failed == 3
+        assert coll.error_message
+        assert dict(coll.prefix_failed) == {'': 1, 'tests/*.py': 1, 'tests': 1}
+        assert dict(coll.suffix_failed) == {'': 1, 'tests/*.py': 1, '*.py': 1}
+
+    def test_collect_select_tests_items(self):
+        coll = Collector(item_collector=coll_items)
+        coll.collect('', select='tests')
+        assert coll.paths == tst_paths
+        assert sorted(coll.selected) == tst_paths
+
+        coll.collect('tests', select='*.py')
+        assert coll.paths == tst_paths
+        assert sorted(coll.files) == tst_files
+        assert sorted(coll.selected) == tst_paths + tst_files
+
+        coll.collect('', select='tests/*.py')
+        assert coll.paths == tst_paths
+        assert sorted(coll.files) == sorted(tst_files * 2)
+        assert sorted(coll.selected) == sorted(tst_paths + tst_files * 2)
+
+        coll.collect('tests', select='')
+        assert coll.paths == tst_paths * 2
+        assert sorted(coll.files) == sorted(tst_files * 2)
+        assert sorted(coll.selected) == sorted(tst_paths * 2 + tst_files * 2)
+
+        coll.collect('tests/*.py')      # collect select kwarg defaults to ''
+        assert coll.paths == tst_paths * 2
+        assert sorted(coll.files) == sorted(tst_files * 3)
+        assert sorted(coll.selected) == sorted(tst_paths * 2 + tst_files * 3)
+
+        assert coll.failed == 0
+        assert not coll.error_message
+        assert dict(coll.prefix_failed) == {}
+        assert coll.suffix_failed == {}
+
+    def test_collect_no_args(self):
+        coll = Collector()
+        coll.collect()
+        assert not coll.paths
+        assert not coll.files
+        assert not coll.selected
+        assert coll.failed == 0
+        assert not coll.error_message
+        assert len(coll.prefix_failed) == 0
+        assert len(coll.suffix_failed) == 0
+
     def test_collect_nothing_found(self):
-        coll = Collector(app="tst_app_path", main_app_name="tst_app_name")
+        coll = Collector(app="tst_app_path")
         prefixes = ("{cwd}/../..", "{app}", "{usr}", "{usr}/{app_name}", "{cwd}/..", "{cwd}", )
         coll.collect(*prefixes, append=(".app_env" + CFG_EXT, ".sys_env" + CFG_EXT, ".sys_envTEST" + CFG_EXT,))
         assert not coll.paths
         # global .app_env.cfg could be found on your local machine - therefore skip: assert not coll.files
         assert not coll.selected
         assert coll.failed == 0
-        assert len(coll.prefix_failed) <= len(prefixes)
-        assert any(count == 0 for count in coll.prefix_failed.values())
+        assert not coll.error_message
+        assert not coll.prefix_failed
+        assert len(coll.prefix_failed) == 0
         assert len(coll.suffix_failed) == 0
 
     def test_collect_appends(self):
-        coll = Collector(app="ae", tst="tests", main_app_name=__file__)
+        coll = Collector(item_collector=coll_items, app="ae", tst="tests")
         coll.collect("{app}", "ae", "", append=("{app_name}", "paths.py", "", "ae"), only_first_of=())
-        assert coll.paths
-        assert coll.files
+        assert coll.paths == ['ae', 'ae', '.', 'ae']
+        assert coll.files == ['ae/paths.py', 'ae/paths.py']
         assert not coll.selected
         assert coll.failed == 0
+        assert not coll.error_message
 
     def test_collect_appends_only_first(self):
-        coll = Collector(app="ae", tst="tests", main_app_name=__file__)
+        coll = Collector(app="ae", tst="tests")
         coll.collect("{app}", "ae", "", append=("{app_name}", "paths.py", "", "ae"))
-        assert not coll.paths
-        assert coll.files
+        assert not coll.paths           # 'ae' not in coll.paths because prefix of ae/paths.py gets found before ""/ae
+        assert coll.files == ['ae/paths.py']
         assert not coll.selected
         assert coll.failed == 0
+        assert not coll.error_message
 
     def test_collect_append_string(self):
         coll = Collector(app="ae", tst="tests", main_app_name=__file__)
         coll.collect("{app}", "ae", "", append="{main_app_name}")
         assert not coll.paths
-        assert coll.files
+        assert len(coll.files) == 1       # ['{cwd}/tests/test_paths.py']
+        assert coll.files[0].endswith('/ae_paths/tests/test_paths.py')
         assert not coll.selected
         assert coll.failed == 0
+        assert not coll.error_message
 
     def test_collect_selects(self):
-        coll = Collector(app="ae", tst="tests", main_app_name="tst_app_name")
+        coll = Collector(item_collector=coll_items, app="ae", tst="tests")
         coll.collect("{cwd}", "{app}", "ae",
                      select=(".*", "README.md", "tests/test_paths.py", "", "ae", ), only_first_of=())
-        assert coll.paths
-        assert coll.files
-        assert coll.selected
-        assert 0 < coll.failed <= len(coll.paths) + len(coll.files)
+
+        assert len(coll.paths) >= 4   # ['{cwd}', '{cwd}/ae', 'ae', 'ae'] + localMachFolders .git/.pylint/.mypy_cache/..
+        assert sum(1 for _ in coll.paths if _ == os.getcwd()) == 1
+        assert sum(1 for _ in coll.paths if _ == os.path.join(os.getcwd(), 'ae')) == 1
+        assert sum(1 for _ in coll.paths if _ == 'ae') == 2
+
+        assert 4 <= len(coll.files) <= 6    # .commit_msg.txt and .python-version are missing on CI host
+        # ['{cwd}/.gitignore', '{cwd}/.commit_msg.txt', '{cwd}/.python-version', '{cwd}/.gitlab-ci.yml',
+        #  '{cwd}/README.md', '{cwd}/tests/test_paths.py']
+        assert all(_.startswith(os.getcwd()) for _ in coll.files)
+        files = [os.path.basename(_) for _ in coll.files]
+        assert '.gitignore' in files
+        assert '.gitlab-ci.yml' in files
+        assert 'README.md' in files
+        assert 'test_paths.py' in files
+
+        assert all(_ in coll.files or _ in coll.paths for _ in coll.selected)
+        assert 0 < coll.failed < len(coll.paths) + len(coll.files)
+        assert coll.error_message
 
     def test_collect_select_only_first(self):
-        coll = Collector(app="ae", tst="tests", main_app_name="tst_app_name")
+        coll = Collector(app="ae", tst="tests")
         coll.collect("{cwd}", "{app}", "ae",
                      select=".*")
         assert not coll.paths
-        assert coll.files
-        assert coll.selected
+        assert 2 <= len(coll.files) <= 4
+        # ['{cwd}/.gitignore', '{cwd}/.commit_msg.txt', '{cwd}/.python-version', '{cwd}/.gitlab-ci.yml']
+        assert all(_.startswith(os.getcwd()) for _ in coll.files)
+        files = [os.path.basename(_) for _ in coll.files]
+        assert '.gitignore' in files
+        assert '.gitlab-ci.yml' in files
+        assert coll.selected == coll.files
         assert coll.failed == 0
+        assert not coll.error_message
 
     def test_collect_select_string(self):
-        coll = Collector(app="ae", tst="tests", main_app_name="tst_app_name")
+        coll = Collector(app="ae", tst="tests")
         coll.collect("{cwd}", "{app}", "ae",
                      select=".*", only_first_of=())
         assert not coll.paths
-        assert coll.files
-        assert coll.selected
-        assert 0 < coll.failed <= len(coll.paths) + len(coll.files)
+        assert 2 <= len(coll.files) <= 4
+        # ['{cwd}/.gitignore', '{cwd}/.gitlab-ci.yml'] only .commit_msg.txt|.python-version not existing on CI host
+        assert all(_.startswith(os.getcwd()) for _ in coll.files)
+        files = [os.path.basename(_) for _ in coll.files]
+        assert '.gitignore' in files
+        assert '.gitlab-ci.yml' in files
+        assert coll.selected == coll.files
+        assert 0 < coll.failed <= len(coll.paths) + len(coll.files)  # failed == 2 from {app}.*|ae.* == ae.*|ae.*
+        assert coll.error_message
 
     def test_collect_prefixes_only(self):
-        coll = Collector(app="ae", tst="tests", main_app_name="tst_app_name")
-        coll.collect("{app}", "{usr}", "tests/test_paths.py", only_first_of=())
-        assert coll.paths
-        assert not coll.files
-        assert coll.selected
-        assert 0 < coll.failed < len(coll.paths) + len(coll.files)
+        coll = Collector(item_collector=coll_items, app="ae", tst="tests")
+        coll.collect("{app}", "{usr}", 'tests/test_paths.py', only_first_of=())
+        assert 1 <= len(coll.paths) <= 2   # ['ae', '/home/andi/.config']
+        assert 'ae' in coll.paths
+        assert coll.files == ['tests/test_paths.py']
+        assert coll.selected == coll.paths + coll.files
+        assert coll.failed == 0
+        assert not coll.error_message
 
     def test_collect_prefixes_only_first_as_string(self):
-        coll = Collector(app="ae", tst="tests", main_app_name="tst_app_name")
+        coll = Collector(item_collector=coll_folders, app="ae", tst="tests")
         coll.collect("{app}", "{usr}", "tests/test_paths.py", only_first_of="prefix")
-        assert coll.paths
+        assert coll.paths == ['ae']
         assert not coll.files
-        assert coll.selected
+        assert coll.selected == ['ae']
         assert coll.failed == 0
+        assert not coll.error_message
+
+    def test_wildcard_recursive(self, test_sub_files):
+        coll = Collector()
+        coll.collect('*.py')
+        assert coll.files == ['setup.py']
+
+        coll = Collector()
+        coll.collect('', append='*.py')
+        assert coll.files == ['setup.py']
+
+        coll = Collector()
+        coll.collect('**', append='*.py')
+        assert sorted(coll.files) == tst_all_py_files
+
+        coll = Collector()
+        coll.collect('*', append='*.py')
+        assert sorted(coll.files)  == sorted(mod_files + tst_files)
+
+        coll = Collector()
+        coll.collect('*/*', append='*.py')
+        assert sorted(coll.files) == tst_sub_py_files1
+
+        coll = Collector()
+        coll.collect('*/*/*', append='*.py')
+        assert sorted(coll.files) == tst_sub_py_files2
+
+        coll = Collector()
+        coll.collect('**/*', append='*.py')
+        assert sorted(coll.files) == sorted(mod_files + tst_files + tst_sub_py_files)
+
+        coll = Collector()
+        coll.collect('*/**', append='*.py')
+        assert sorted(coll.files) == sorted(mod_files + tst_files + tst_sub_py_files)
+
+        assert coll.failed == 0
+        assert not coll.error_message
 
 
 class TestFilesRegister:
