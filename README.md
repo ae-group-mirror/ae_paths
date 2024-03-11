@@ -1,12 +1,12 @@
-<!-- THIS FILE IS EXCLUSIVELY MAINTAINED by the project ae.ae V0.3.90 -->
-<!-- THIS FILE IS EXCLUSIVELY MAINTAINED by the project aedev.tpl_namespace_root V0.3.12 -->
-# paths 0.3.26
+<!-- THIS FILE IS EXCLUSIVELY MAINTAINED by the project ae.ae V0.3.92 -->
+<!-- THIS FILE IS EXCLUSIVELY MAINTAINED by the project aedev.tpl_namespace_root V0.3.13 -->
+# paths 0.3.27
 
 [![GitLab develop](https://img.shields.io/gitlab/pipeline/ae-group/ae_paths/develop?logo=python)](
     https://gitlab.com/ae-group/ae_paths)
 [![LatestPyPIrelease](
-    https://img.shields.io/gitlab/pipeline/ae-group/ae_paths/release0.3.25?logo=python)](
-    https://gitlab.com/ae-group/ae_paths/-/tree/release0.3.25)
+    https://img.shields.io/gitlab/pipeline/ae-group/ae_paths/release0.3.26?logo=python)](
+    https://gitlab.com/ae-group/ae_paths/-/tree/release0.3.26)
 [![PyPIVersions](https://img.shields.io/pypi/v/ae_paths)](
     https://pypi.org/project/ae-paths/#history)
 
