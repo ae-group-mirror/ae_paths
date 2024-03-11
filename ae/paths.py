@@ -280,7 +280,7 @@ from ae.base import app_name_guess, env_str, norm_path, os_platform             
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile                 # type: ignore
 
 
-__version__ = '0.3.27'
+__version__ = '0.3.28'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
@@ -612,16 +612,20 @@ def path_items(item_mask: str, selector: Callable[[str], Any] = str,
     return [path for _, path in coll_items(item_mask, selector=selector, creator=creator, **creator_kwargs)]
 
 
-def path_join(first_part: str, *parts: str) -> str:
+def path_join(*parts: str) -> str:
     """ join path parts preventing trailing path separator if last part is empty string.
 
-    :param first_part:          first path part (to have the same function signature like :func:`os.path.join`).
-    :param parts:               additional path parts to join onto.
+    :param parts:               path parts to join.
     :return:                    joined path string.
     """
-    # path = os.path.join(first_part, *parts)
-    # return path[:-1] if path.endswith('/') else path
-    return '/'.join(_ for _ in (first_part, ) + parts if _)
+    assert parts, "missing required positional argument(s) with path parts to join"
+
+    part_index = len(parts)     # simulate os.path.join() to ignore parts on the left of part with root path
+    while part_index:
+        part_index -= 1
+        if parts[part_index].startswith('/'):
+            break
+    return '/'.join(_ for _ in parts[part_index:] if _)
 
 
 def path_name(path: str) -> str:
