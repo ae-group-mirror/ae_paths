@@ -1,9 +1,8 @@
 """ ae.paths unit tests """
 import glob
-
-import pytest
 import os
 import pathlib
+import pytest
 import shutil
 from unittest.mock import patch
 
@@ -71,13 +70,20 @@ def file_sorter_mock(file):
 
 class TestHelpers:
     def test_path_join(self):
+        assert path_join('') == os.path.join('')
+        assert path_join('part') == os.path.join('part')
         assert path_join('part', 'part2') == os.path.join('part', 'part2')
+        assert path_join('part', '', 'part2') == os.path.join('part', '', 'part2')
+        assert path_join('part', '.', 'part2') == os.path.join('part', '.', 'part2')
+        assert path_join('part', '..', 'part2') == os.path.join('part', '..', 'part2')
         assert path_join('part', '/part2') == os.path.join('part', '/part2')
+        assert path_join('part', '/', 'part2') == os.path.join('part', '/', 'part2')
+        assert path_join('part', '//', 'part2') == os.path.join('part', '//', 'part2')
         assert path_join('/part', 'part2') == os.path.join('/part', 'part2')
         assert path_join('', 'part2') == os.path.join('', 'part2')
 
-        assert path_join('part', '') != os.path.join('part', '')
         assert path_join('part', '') == 'part'  # os.path.join() returns 'part/' in this case
+        assert path_join('part', '') != os.path.join('part', '')
 
     def test_path_name(self):
         assert path_name("") == ""
