@@ -82,8 +82,10 @@ its :meth:`~Collector.collect` method with a file or folder path, which can cont
 
 .. code-block:: python
 
+    from ae.paths import Collector
     coll = Collector()
     coll.collect('*.png')
+    image_files_list = coll.files
 
 after that a list containing the found file names can then be retrieved from the :attr:`~Collector.files` attribute.
 
@@ -138,12 +140,28 @@ collect from multiple locations
 _______________________________
 
 in a single call of :meth:`~Collector.collect`, providing the method parameters :paramref:`~Collector.collect.append`
-or :paramref:`~Collector.collect.select`, you can scan multiple combinations of path prefixes and file/folder names
-(suffixes).
+or :paramref:`~Collector.collect.select`, you can scan multiple combinations of path prefixes and suffixes, which can
+both contain wildcards and folder names, whereas the suffixes containing also parts of the file names to search for.
 
-the following example is collecting the absolute paths of files with the name `xxx.cfg`
-from the first found location/folder, starting to search in the current working directory, then in the folder above the
-application data folder, and finally in a folder with the name of the main application underneath the user data folder::
+.. hint:: the wildcards `*`, `**` and `?` are allowed in the prefixes as well as in suffixes.
+
+the resulting file paths are relative or absolute, depending on if the specified prefix(es) containing
+absolute or relative paths.
+
+in the following example determines the relative paths of all folders directly underneath the current working directory
+with a name that contains the string `'xxx'` or is starting with `'yyy'` or is ending with  `'zzz'`::
+
+.. code-block:: python
+
+    coll = Collector(item_collector=coll_folders)
+    coll.collect('', append=('*xxx*', 'yyy*', '*zzz'))
+    folders = coll.paths
+
+.. hint:: replace empty string in the first argument of :meth:`~Collector.collect` with '{cwd}' to get absolute paths.
+
+the following example is collecting the absolute paths of files with the name `xxx.cfg` from the first found
+location/folder, starting to search in the current working directory, then in the folder above the application
+data folder, and finally in a folder with the name of the main application underneath the user data folder::
 
 .. code-block:: python
 
@@ -152,8 +170,8 @@ application data folder, and finally in a folder with the name of the main appli
     found_files = coll.files
 
 to set or change the generic path placeholder parts values, e.g. of the main application name (`{main_app_name}`) and
-the application data path (`{app}`), you simply specify them as kwargs in the construction of the :class:`Collector`
-instance::
+the application data path (`{app}`), you simply specify their corresponding values as kwargs in the construction
+of the :class:`Collector` instance::
 
 .. code-block:: python
 
@@ -177,18 +195,6 @@ add one of the strings `'prefix'`, `'append'` or `'select'` to the :paramref:`~C
 argument to collect only the files/folders of the first combination of the specified prefixes, append-suffixes
 and select-suffixes.
 
-wildcards are allowed in the prefixes as well as in file names. in the following example determines the relative
-paths of all folders directly underneath the current working directory
-with a name that contains the string `'xxx'` or is starting with `'yyy'` or is ending with  `'zzz'`::
-
-.. code-block:: python
-
-    coll = Collector(item_collector=coll_folders)
-    coll.collect('', append=('*xxx*', 'yyy*', '*zzz'))
-    folders = coll.paths
-
-.. hint:: replace empty string in the first argument of :meth:`~Collector.collect` with '{cwd}' to get absolute paths.
-
 by using the :paramref:`~Collector.collect.select` argument the found files and folders will additionally be collected
 in the :class:`Collector` instance attribute :attr:`~Collector.selected`.
 
@@ -208,7 +214,7 @@ files can be collected from various places by a single instance of the class :cl
 
 .. code-block:: python
 
-    from ae.files import FilesRegister
+    from ae.paths import FilesRegister
 
     file_reg = FilesRegister('first/path/to/collect')
     file_reg.add_paths('second/path/to/collect/files/from')
@@ -220,8 +226,9 @@ the two provided paths. then the :meth:`~FilesRegister.find_file` method will re
 :class:`~ae.files.RegisteredFile` of the last collected file with the stem (base name w/o extension) `'file_name'`.
 
 multiple files with the same stem can be collected and registered e.g. with different formats, to be selected by
-the app by their different properties. assuming your application is providing an icon image in two sizes, provided
-within the following directory structure::
+the app by their different properties, which are specified in the folder names underneath the collected paths.
+assuming your application is providing an icon image in two sizes, provided
+within the following folder structure, situated in the current working directory::
 
     resources/
         size_72/
@@ -229,39 +236,38 @@ within the following directory structure::
         size_150/
             app_icon.png
 
-first create an instance of :class:`FilesRegister` to collect both image files from the `resources` folder,
-interpreting any sub-folder names (like `size_*`) as attributes for the registered files::
+when you then create an instance of :class:`FilesRegister` both image files from the `resources` folder will get
+registered, interpreting the sub-folder names (`size_*`) as properties or attributes for the registered files,
+where `size` will result as the property name and the string after the underscore as the property value.
+
+to retrieve the paths of the application image file with the size ``72``, call the
+:meth:`~FilesRegister.find_file` method::
 
 .. code-block:: python
 
     file_reg = FilesRegister('resources')
-
-the resulting object `file_reg` behaves like a dict object, where the item key is the file stem
-('app_icon') and the item value is a list of instances of :class:`~ae.files.RegisteredFile`. both files in the
-resources folder are provided as one dict item::
-
-.. code-block:: python
-
-    assert 'app_icon' in file_reg
-    assert len(file_reg) == 1
-    assert len(file_reg['app_icon']) == 2
-    assert isinstance(file_reg['app_icon'][0], RegisteredFile)
-
-to select the appropriate image file you can use the :meth:`~FilesRegister.find_file` method::
-
-.. code-block:: python
-
-    app_icon_image_path = file_reg.find_file('app_icon', dict(size=current_size))
+    app_icon_image_path = file_reg.find_file('app_icon', dict(size=72))
 
 as a shortcut you can alternatively call the object directly (leaving `.find_file` away)::
 
 .. code-block:: python
 
-    app_icon_image_path = file_reg('app_icon', dict(size=current_size))
+    app_icon_image_path = file_reg('app_icon', dict(size=150))
 
-if now the `current_size` variable contains the integer ``150``, then `app_icon_image_path` will result in
-`"resources/size_150/app_icon.png"`. in contrary if the `current_size` variable contains the integer `72`, then
-`app_icon_image_path` will result in `"resources/size_72/app_icon.jpg"`.
+the resulting file path in `app_icon_image_path` will be `"resources/size_72/app_icon.jpg"` in the forelast example
+and `"resources/size_150/app_icon.png"` in the last example.
+
+an instance of :class:`FilesRegister` (`file_reg`) behaves like a dict object, where the item key is the file stem
+('app_icon') and the item value is a list of instances of :class:`~ae.files.RegisteredFile`. both files in the
+resources folder are provided as one dict item::
+
+.. code-block:: python
+
+    file_reg = FilesRegister('resources')
+    assert 'app_icon' in file_reg
+    assert len(file_reg) == 1
+    assert len(file_reg['app_icon']) == 2
+    assert isinstance(file_reg['app_icon'][0], RegisteredFile)
 
 for more complex selections you can use callables passed into the :paramref:`~FilesRegister.find_file.property_matcher`
 and :paramref:`~FilesRegister.find_file.file_sorter` arguments of :meth:`~FilesRegister.find_file`.
@@ -280,7 +286,7 @@ from ae.base import app_name_guess, env_str, norm_path, os_platform             
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile                 # type: ignore
 
 
-__version__ = '0.3.28'
+__version__ = '0.3.29'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
@@ -617,6 +623,24 @@ def path_join(*parts: str) -> str:
 
     :param parts:               path parts to join.
     :return:                    joined path string.
+
+    .. hint::
+        although :func:`os.path.join` is implemented in C, this function is faster::
+        .. code-block:: python
+
+            import os
+            import timeit
+            from ae.paths import path_join
+            paths_secs = timeit.timeit('path_join("test", "sub_test", "sub_sub_test")', globals=globals())
+            os_secs = timeit.timeit('os.path.join("test", "sub_test", "sub_sub_test")', globals=globals())
+            assert paths_secs < os_secs
+
+        even if you import :func:`os.path.join` without the namespace prefixes, like this::
+        .. code-block:: python
+
+            from os.path import join as os_join
+            os_secs = timeit.timeit('os_join("test", "sub_test", "sub_sub_test")', globals=globals())
+            assert paths_secs < os_secs
     """
     assert parts, "missing required positional argument(s) with path parts to join"
 
@@ -625,7 +649,7 @@ def path_join(*parts: str) -> str:
         part_index -= 1
         if parts[part_index].startswith('/'):
             break
-    return '/'.join(_ for _ in parts[part_index:] if _)
+    return '/'.join(_ for _ in parts[part_index:] if _).replace('//', '/')
 
 
 def path_name(path: str) -> str:
