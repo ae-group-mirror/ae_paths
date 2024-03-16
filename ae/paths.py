@@ -32,6 +32,10 @@ file path trees. these two functions are based on :func:`copy_file` and :func:`m
 the functions :func:`copy_tree` and :func:`move_tree` providing an alternative way to copy or move
 entire directory trees.
 
+to determine if the path of a file or folder is matching a glob-like path pattern/mask with wildcards, the
+functions :func:`path_match` and :func:`paths_match` can be used. useful specially for cases where you don't
+have direct access to the file system.
+
 file paths for series of files, e.g. for logging, can be determined via the :func:`series_file_name` function.
 
 the helper function :func:`normalize` converts path strings containing path placeholders into regular path strings,
@@ -254,7 +258,7 @@ as a shortcut you can alternatively call the object directly (leaving `.find_fil
 
     app_icon_image_path = file_reg('app_icon', dict(size=150))
 
-the resulting file path in `app_icon_image_path` will be `"resources/size_72/app_icon.jpg"` in the forelast example
+the resulting file path in `app_icon_image_path` will be `"resources/size_72/app_icon.jpg"` in the penultimate example
 and `"resources/size_150/app_icon.png"` in the last example.
 
 an instance of :class:`FilesRegister` (`file_reg`) behaves like a dict object, where the item key is the file stem
@@ -274,19 +278,21 @@ and :paramref:`~FilesRegister.find_file.file_sorter` arguments of :meth:`~FilesR
 """
 import glob
 import os
+import re
 import shutil
 import string
 import sys
 
 from collections import defaultdict
 from functools import partial
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Type, Union, cast
+from pathlib import PurePath
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Type, Union, cast
 
 from ae.base import app_name_guess, env_str, norm_path, os_platform                         # type: ignore
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile                 # type: ignore
 
 
-__version__ = '0.3.29'
+__version__ = '0.3.30'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
@@ -652,6 +658,47 @@ def path_join(*parts: str) -> str:
     return '/'.join(_ for _ in parts[part_index:] if _).replace('//', '/')
 
 
+escaped_glob_tokens_to_re = dict((
+    # order of ``**/`` and ``/**`` in RE tokenization pattern doesn't matter because ``**/`` will be caught first
+    # no matter what, making ``/**`` the only option later on.
+    # w/o leading or trailing ``/`` two consecutive asterisks will be treated as literals.
+    (r'/\*\*', r'(?:/.+?)*'),   # edge-case #1. catches recursive globs in the middle of path. Requires edge case #2
+                                # handled after this case.
+    (r'\*\*/', r'(?:^.+?/)*'),  # edge-case #2. catches recursive globs at the start of path. Requires edge case #1
+                                # handled before this case. ``^`` is used to ensure proper location for ``**/``.
+    (r'\*', r'[^/]*'),          # ``[^/]*`` is used to ensure that ``*`` won't match sub-dirs, as with naive ``.*?``.
+    (r'\?', r'.'),
+    (r'\[\*\]', r'\*'),         # escaped special glob character.
+    (r'\[\?\]', r'\?'),         # escaped special glob character.
+    (r'\[!', r'[^'),            # requires to be ordered dict, so that ``\[!`` preceded ``\[`` in RE mask. Needed mostly
+    # to differentiate between ``!`` used within character class ``[]`` and outside of it, to avoid faulty conversion.
+    (r'\[', r'['),
+    (r'\]', r']'),
+))
+
+escaped_glob_replacement = re.compile('(%s)' % '|'.join(escaped_glob_tokens_to_re).replace('\\', '\\\\\\'))
+""" pre-compiled regular expression for :func:`path_match`, inspired by the great SO answer of Pugsley (see
+https://stackoverflow.com/questions/27726545/63212852#63212852)
+"""
+
+
+def path_match(path: str, mask: str) -> bool:
+    """ return True if the specified path matches the specified path mask/pattern.
+
+    :param path:                path string to match.
+    :param mask:                path mask/pattern including glob-like wildcards.
+    :return:                    True if the path specified by :paramref:`.path` matches the mask/pattern
+                                specified by the :paramref:`mask` argument.
+    """
+    if sys.version_info < (3, 13):
+        re_mask = escaped_glob_replacement.sub(lambda _m: escaped_glob_tokens_to_re[_m.group(0)], re.escape(mask))
+        match = bool(re.fullmatch(re_mask, path))
+    else:
+        # noinspection PyUnresolvedReferences
+        match = PurePath(path).full_match(mask)
+    return match
+
+
 def path_name(path: str) -> str:
     """ determine placeholder key name of the specified path.
 
@@ -664,6 +711,23 @@ def path_name(path: str) -> str:
         if normalize(registered_path, make_absolute=False, remove_dots=False, resolve_sym_links=False) == search_path:
             return name
     return ""
+
+
+def paths_match(paths: Sequence[str], masks: Sequence[str]) -> list[str]:
+    """ determine the paths matching glob-like wildcard masks.
+
+    :param paths:               sequence of path strings to be checked if they match at least one pattern/mask,
+                                specified by the :paramref:`.masks` argument.
+    :param masks:               sequence of path masks/pattern with glob-like wildcards.
+    :return:                    list of the paths specified by :paramref:`.paths` that match at least one mask,
+                                specified by the :paramref:`.masks` argument.
+    """
+    matching_paths = []
+    for path in paths:
+        for mask in masks:
+            if path_match(path, mask):
+                matching_paths.append(path)
+    return matching_paths
 
 
 def placeholder_key(path: str) -> str:

@@ -11,7 +11,8 @@ from ae.files import read_file_text, write_file_text, CachedFile, RegisteredFile
 from ae.paths import (PATH_PLACEHOLDERS,
                       add_common_storage_paths, app_data_path, app_docs_path, coll_folders, coll_items,
                       copy_files, move_files,
-                      normalize, path_files, path_folders, path_items, path_join, path_name, placeholder_key,
+                      normalize, path_files, path_folders, path_items, path_join, path_match, path_name,
+                      paths_match, placeholder_key,
                       placeholder_path,
                       series_file_name, user_data_path, user_docs_path, Collector, FilesRegister)
 
@@ -85,6 +86,36 @@ class TestHelpers:
         assert path_join('part', '') == 'part'  # os.path.join() returns 'part/' in this case
         assert path_join('part', '') != os.path.join('part', '')
 
+    def test_path_match(self):
+        assert path_match('c.py', '?.py')
+        assert path_match('c.py', '?.p?')
+        assert not path_match('c.py', '??.p?')
+        assert not path_match('c.py', '?.p??')
+
+        assert path_match('c.py', '*')
+        assert path_match('c.py', '*.py')
+        assert path_match('c.py', 'c*.py')
+
+        assert path_match('c.py', '**/*.py')
+        assert path_match('a/b/c.py', '**/*.py')
+        assert path_match('/a/b/c.py', '**/*.py')
+        assert path_match('a/b/c.py', 'a/**')
+        assert path_match('/a/b/c.py', '/a/**')
+        assert path_match('a/b/c.py', 'a/**/b/**')
+        assert path_match('/a/b/c.py', '/a/**/b/**')
+        assert path_match('a/b/c.py', 'a/**/b/**/c.*')
+        assert path_match('/a/b/c.py', '/a/**/b/**/c.*')
+        assert not path_match('a/b/c.py', 'a/*')
+        assert not path_match('/a/b/c.py', 'a/*')
+        assert not path_match('a/b/c.py', 'a**/*.py')
+        assert not path_match('/a/b/c.py', 'a**/*.py')
+        assert not path_match('a/b/c.py', '/a/**')
+        assert not path_match('/a/b/c.py', 'a/**')
+
+        assert path_match('abc.py', '[axy]bc.py')
+        assert path_match('abc.py', 'ab[cxy].py')
+        assert path_match('abc.py', 'ab[!dxy].py')
+
     def test_path_name(self):
         assert path_name("") == ""
         assert path_name("/not/a/existing/test/path") == ""
@@ -98,6 +129,14 @@ class TestHelpers:
             else:
                 names = duplicates1 if name in duplicates1 else duplicates2 if name in duplicates2 else (name,)
                 assert path_name(path) in names
+
+    def test_paths_match(self):
+        assert paths_match(['c.py'], ['**/*.py']) == ['c.py']
+        assert paths_match(['a.py', 'a/b/c.d'], ['**/*.py']) == ['a.py']
+        assert paths_match(['a.py', 'a/b/c.py'], ['**/*.py']) == ['a.py', 'a/b/c.py']
+        assert paths_match(['c.py'], ['**/*.py', 'file.name']) == ['c.py']
+        assert paths_match(['file.name', 'x.y'], ['**/*.d', 'file.name']) == ['file.name']
+        assert paths_match(['c.py'], ['**/*.d', 'file.name']) == []
 
 
 class TestPlaceholders:
