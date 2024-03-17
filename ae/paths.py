@@ -32,14 +32,17 @@ file path trees. these two functions are based on :func:`copy_file` and :func:`m
 the functions :func:`copy_tree` and :func:`move_tree` providing an alternative way to copy or move
 entire directory trees.
 
+the helper function :func:`normalize` converts path strings containing path placeholders into regular path strings,
+resolving symbolic links, or is converting paths string from absolute paths to relative paths and vice versa.
+
 to determine if the path of a file or folder is matching a glob-like path pattern/mask with wildcards, the
 functions :func:`path_match` and :func:`paths_match` can be used. useful specially for cases where you don't
 have direct access to the file system.
 
 file paths for series of files, e.g. for logging, can be determined via the :func:`series_file_name` function.
 
-the helper function :func:`normalize` converts path strings containing path placeholders into regular path strings,
-resolving symbolic links, or is converting paths string from absolute paths to relative paths and vice versa.
+the function :func:`skip_py_cache_files` can be used in path file collections to skip the files situated in the
+Python cache folder (:data:`~ae.base.PY_CACHE_FOLDER` respectively ``__pycache__``).
 
 
 generic system paths
@@ -288,11 +291,11 @@ from functools import partial
 from pathlib import PurePath
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Type, Union, cast
 
-from ae.base import app_name_guess, env_str, norm_path, os_platform                         # type: ignore
+from ae.base import PY_CACHE_FOLDER, app_name_guess, env_str, norm_path, os_platform        # type: ignore
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile                 # type: ignore
 
 
-__version__ = '0.3.30'
+__version__ = '0.3.31'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
@@ -658,25 +661,24 @@ def path_join(*parts: str) -> str:
     return '/'.join(_ for _ in parts[part_index:] if _).replace('//', '/')
 
 
-escaped_glob_tokens_to_re = dict((
+_path_match_tokens_to_re = {
     # order of ``**/`` and ``/**`` in RE tokenization pattern doesn't matter because ``**/`` will be caught first
     # no matter what, making ``/**`` the only option later on.
     # w/o leading or trailing ``/`` two consecutive asterisks will be treated as literals.
-    (r'/\*\*', r'(?:/.+?)*'),   # edge-case #1. catches recursive globs in the middle of path. Requires edge case #2
+    r'/\*\*': r'(?:/.+?)*',     # edge-case #1. catches recursive globs in the middle of path. Requires edge case #2
                                 # handled after this case.
-    (r'\*\*/', r'(?:^.+?/)*'),  # edge-case #2. catches recursive globs at the start of path. Requires edge case #1
+    r'\*\*/': r'(?:^.+?/)*',    # edge-case #2. catches recursive globs at the start of path. Requires edge case #1
                                 # handled before this case. ``^`` is used to ensure proper location for ``**/``.
-    (r'\*', r'[^/]*'),          # ``[^/]*`` is used to ensure that ``*`` won't match sub-dirs, as with naive ``.*?``.
-    (r'\?', r'.'),
-    (r'\[\*\]', r'\*'),         # escaped special glob character.
-    (r'\[\?\]', r'\?'),         # escaped special glob character.
-    (r'\[!', r'[^'),            # requires to be ordered dict, so that ``\[!`` preceded ``\[`` in RE mask. Needed mostly
+    r'\*': r'[^/]*',            # ``[^/]*`` is used to ensure that ``*`` won't match sub-dirs, as with naive ``.*?``.
+    r'\?': r'.',
+    r'\[\*\]': r'\*',           # escaped special glob character.
+    r'\[\?\]': r'\?',           # escaped special glob character.
+    r'\[!': r'[^',              # requires to be ordered dict, so that ``\[!`` preceded ``\[`` in RE mask. Needed mostly
     # to differentiate between ``!`` used within character class ``[]`` and outside of it, to avoid faulty conversion.
-    (r'\[', r'['),
-    (r'\]', r']'),
-))
-
-escaped_glob_replacement = re.compile('(%s)' % '|'.join(escaped_glob_tokens_to_re).replace('\\', '\\\\\\'))
+    r'\[': r'[',
+    r'\]': r']',
+}
+_path_match_replacement = re.compile("(" + '|'.join(_path_match_tokens_to_re).replace('\\', '\\\\\\') + ")")
 """ pre-compiled regular expression for :func:`path_match`, inspired by the great SO answer of Pugsley (see
 https://stackoverflow.com/questions/27726545/63212852#63212852)
 """
@@ -691,11 +693,11 @@ def path_match(path: str, mask: str) -> bool:
                                 specified by the :paramref:`mask` argument.
     """
     if sys.version_info < (3, 13):
-        re_mask = escaped_glob_replacement.sub(lambda _m: escaped_glob_tokens_to_re[_m.group(0)], re.escape(mask))
+        re_mask = _path_match_replacement.sub(lambda _m: _path_match_tokens_to_re[_m.group(0)], re.escape(mask))
         match = bool(re.fullmatch(re_mask, path))
     else:
         # noinspection PyUnresolvedReferences
-        match = PurePath(path).full_match(mask)
+        match = PurePath(path).full_match(mask)                 # pragma: no cover
     return match
 
 
@@ -713,8 +715,8 @@ def path_name(path: str) -> str:
     return ""
 
 
-def paths_match(paths: Sequence[str], masks: Sequence[str]) -> list[str]:
-    """ determine the paths matching glob-like wildcard masks.
+def paths_match(paths: Sequence[str], masks: Sequence[str]) -> Iterable[str]:
+    """ filter the paths matching at least one of the specified glob-like wildcard masks.
 
     :param paths:               sequence of path strings to be checked if they match at least one pattern/mask,
                                 specified by the :paramref:`.masks` argument.
@@ -722,12 +724,11 @@ def paths_match(paths: Sequence[str], masks: Sequence[str]) -> list[str]:
     :return:                    list of the paths specified by :paramref:`.paths` that match at least one mask,
                                 specified by the :paramref:`.masks` argument.
     """
-    matching_paths = []
     for path in paths:
         for mask in masks:
             if path_match(path, mask):
-                matching_paths.append(path)
-    return matching_paths
+                yield path
+                break
 
 
 def placeholder_key(path: str) -> str:
@@ -781,6 +782,15 @@ def series_file_name(file_path: str, digits: int = 2, marker: str = " ", create:
         open(file_path, 'w').close()
 
     return file_path
+
+
+def skip_py_cache_files(file_path: str) -> bool:
+    """ file exclude callback for the files under Python's cache folders.
+
+    :param file_path:       path to file to check for exclusion, relative to the project root folder.
+    :return:                True if the file specified in :paramref:`.file_path` has to excluded, else False.
+    """
+    return PY_CACHE_FOLDER in file_path.split('/')
 
 
 def user_data_path() -> str:
