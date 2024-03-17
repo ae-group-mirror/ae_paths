@@ -6,7 +6,7 @@ import pytest
 import shutil
 from unittest.mock import patch
 
-from ae.base import CFG_EXT, INI_EXT, TESTS_FOLDER, app_name_guess, os_platform, write_file
+from ae.base import CFG_EXT, INI_EXT, PY_CACHE_FOLDER, TESTS_FOLDER, app_name_guess, os_platform, write_file
 from ae.files import read_file_text, write_file_text, CachedFile, RegisteredFile
 from ae.paths import (PATH_PLACEHOLDERS,
                       add_common_storage_paths, app_data_path, app_docs_path, coll_folders, coll_items,
@@ -14,7 +14,7 @@ from ae.paths import (PATH_PLACEHOLDERS,
                       normalize, path_files, path_folders, path_items, path_join, path_match, path_name,
                       paths_match, placeholder_key,
                       placeholder_path,
-                      series_file_name, user_data_path, user_docs_path, Collector, FilesRegister)
+                      series_file_name, skip_py_cache_files, user_data_path, user_docs_path, Collector, FilesRegister)
 
 
 file_root = 'TstRootFolder'
@@ -131,12 +131,19 @@ class TestHelpers:
                 assert path_name(path) in names
 
     def test_paths_match(self):
-        assert paths_match(['c.py'], ['**/*.py']) == ['c.py']
-        assert paths_match(['a.py', 'a/b/c.d'], ['**/*.py']) == ['a.py']
-        assert paths_match(['a.py', 'a/b/c.py'], ['**/*.py']) == ['a.py', 'a/b/c.py']
-        assert paths_match(['c.py'], ['**/*.py', 'file.name']) == ['c.py']
-        assert paths_match(['file.name', 'x.y'], ['**/*.d', 'file.name']) == ['file.name']
-        assert paths_match(['c.py'], ['**/*.d', 'file.name']) == []
+        assert list(paths_match(['c.py'], ['**/*.py'])) == ['c.py']
+        assert list(paths_match(['a.py', 'a/b/c.d'], ['**/*.py'])) == ['a.py']
+        assert list(paths_match(['a.py', 'a/b/c.py'], ['**/*.py'])) == ['a.py', 'a/b/c.py']
+        assert list(paths_match(['c.py'], ['**/*.py', 'file.name'])) == ['c.py']
+        assert list(paths_match(['file.name', 'x.y'], ['**/*.d', 'file.name'])) == ['file.name']
+        assert list(paths_match(['c.py'], ['**/*.d', 'file.name'])) == []
+
+    def test_skip_py_cache_files(self):
+        assert skip_py_cache_files(PY_CACHE_FOLDER)
+        assert skip_py_cache_files(f'a/c/c/{PY_CACHE_FOLDER}')
+        assert skip_py_cache_files(f'/a/c/c/{PY_CACHE_FOLDER}')
+        assert skip_py_cache_files(f'a/c/c/{PY_CACHE_FOLDER}/.')
+        assert skip_py_cache_files(f'a/c/c/{PY_CACHE_FOLDER}/x.py')
 
 
 class TestPlaceholders:
