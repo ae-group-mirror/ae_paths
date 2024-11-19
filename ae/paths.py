@@ -174,7 +174,7 @@ additionally you can specify any other path placeholders that will be automatica
     coll = Collector(any_other_placeholder=...)
 
 by default only the found file(s)/folder(s) of the first combination will be collected. to collect all files instead,
-pass an empty tuple to the method argument :paramref:`~Collector.collect.only_first_of` of :meth:`~Collector.collect'::
+pass an empty tuple to the method argument :paramref:`~Collector.collect.only_first_of` of :meth:`~Collector.collect`::
 
     coll.collect(..., append=..., [select=..., ] only_first_of=())
 
@@ -267,7 +267,7 @@ from ae.base import PY_CACHE_FOLDER, app_name_guess, env_str, norm_path, os_plat
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile                 # type: ignore
 
 
-__version__ = '0.3.32'
+__version__ = '0.3.33'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
