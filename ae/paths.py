@@ -267,7 +267,7 @@ from ae.base import PY_CACHE_FOLDER, app_name_guess, env_str, norm_path, os_plat
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile                 # type: ignore
 
 
-__version__ = '0.3.33'
+__version__ = '0.3.34'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
