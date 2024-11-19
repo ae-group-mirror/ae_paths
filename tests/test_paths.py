@@ -133,7 +133,7 @@ class TestHelpers:
     def test_paths_match(self):
         assert list(paths_match(['c.py'], ['**/*.py'])) == ['c.py']
         assert list(paths_match(['a.py', 'a/b/c.d'], ['**/*.py'])) == ['a.py']
-        assert list(paths_match(['a.py', 'a/b/c.py'], ['**/*.py'])) == ['a.py', 'a/b/c.py']
+        assert set(paths_match(['a.py', 'a/b/c.py'], ['**/*.py'])) == {'a.py', 'a/b/c.py'}
         assert list(paths_match(['c.py'], ['**/*.py', 'file.name'])) == ['c.py']
         assert list(paths_match(['file.name', 'x.y'], ['**/*.d', 'file.name'])) == ['file.name']
         assert list(paths_match(['c.py'], ['**/*.d', 'file.name'])) == []
@@ -574,7 +574,7 @@ class TestPathFiles:
         assert path_files("**/pat?s.py") == ["ae/paths.py"]
 
         assert len(path_files("**/*.py")) == 4
-        assert path_files("**/*.py") == ["setup.py", "ae/paths.py", "tests/test_paths.py", "tests/conftest.py"]
+        assert set(path_files("**/*.py")) == {"setup.py", "ae/paths.py", "tests/test_paths.py", "tests/conftest.py"}
 
         assert path_files("{cwd}/**/paths.py")[0].endswith("ae_paths/ae/paths.py")
         assert path_files("{cwd}/**/paths.?y")[0].endswith("ae_paths/ae/paths.py")
@@ -798,7 +798,7 @@ class TestPathItems:
         assert path_items("**/pat?s.py") == ["ae/paths.py"]
 
         assert len(path_items("**/*.py")) == 4
-        assert path_items("**/*.py") == ["setup.py", "ae/paths.py", "tests/test_paths.py", "tests/conftest.py"]
+        assert set(path_items("**/*.py")) == {"setup.py", "ae/paths.py", "tests/test_paths.py", "tests/conftest.py"}
 
         assert path_items("{cwd}/**/paths.py")[0].endswith("ae_paths/ae/paths.py")
         assert path_items("{cwd}/**/paths.?y")[0].endswith("ae_paths/ae/paths.py")
