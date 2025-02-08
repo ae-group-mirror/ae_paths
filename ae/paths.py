@@ -267,7 +267,7 @@ from ae.base import PY_CACHE_FOLDER, app_name_guess, env_str, norm_path, os_plat
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile                 # type: ignore
 
 
-__version__ = '0.3.34'
+__version__ = '0.3.35'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
@@ -381,16 +381,16 @@ def add_common_storage_paths():
 
     the following storage paths are provided by the `plyer` PyPi package (not all of them are available in each OS):
 
-    * `application`: user application directory.
-    * `documents`: user documents directory.
-    * `downloads`: user downloads directory.
-    * `external_storage`: external storage root directory.
-    * `home`: user home directory.
-    * `music`: user music directory.
-    * `pictures`: user pictures directory.
-    * `root`: root directory of the operating system partition.
-    * `sdcard`: SD card root directory (only available in Android if sdcard is inserted).
-    * `videos`: user videos directory.
+    * `{application}`: user application directory.
+    * `{documents}`: user documents directory.
+    * `{downloads}`: user downloads directory.
+    * `{external_storage}`: external storage root directory.
+    * `{home}`: user home directory.
+    * `{music}`: user music directory.
+    * `{pictures}`: user pictures directory.
+    * `{root}`: root directory of the operating system partition.
+    * `{sdcard}`: SD card root directory (only available in Android if sdcard is inserted).
+    * `{videos}`: user videos directory.
 
     additionally storage paths that are only available on certain OS (inspired by the method `get_drives`, implemented
     in `<https://github.com/kivy-garden/filebrowser/blob/master/kivy_garden/filebrowser/__init__.py>`_):
@@ -821,15 +821,15 @@ def user_docs_path() -> str:
 
 
 # noinspection PyDictCreation
-PATH_PLACEHOLDERS = {}   #: placeholders of user-, os- and app-specific system paths and file name parts
+PATH_PLACEHOLDERS = {}   #: placeholders dict of user-, os- and app-specific system paths and file name parts
 
-PATH_PLACEHOLDERS['app_name'] = app_name_guess()
+PATH_PLACEHOLDERS['app_name'] = app_name_guess()    #: {app_name} path placeholder
 
-PATH_PLACEHOLDERS['ado'] = app_docs_path()
-PATH_PLACEHOLDERS['app'] = app_data_path()
-PATH_PLACEHOLDERS['cwd'] = os.getcwd()
-PATH_PLACEHOLDERS['doc'] = user_docs_path()
-PATH_PLACEHOLDERS['usr'] = user_data_path()
+PATH_PLACEHOLDERS['ado'] = app_docs_path()          #: {ado} path placeholder
+PATH_PLACEHOLDERS['app'] = app_data_path()          #: {app} path placeholder
+PATH_PLACEHOLDERS['cwd'] = os.getcwd()              #: {cwd} path placeholder
+PATH_PLACEHOLDERS['doc'] = user_docs_path()         #: {doc} path placeholder
+PATH_PLACEHOLDERS['usr'] = user_data_path()         #: {usr} path placeholder
 
 
 class Collector:
