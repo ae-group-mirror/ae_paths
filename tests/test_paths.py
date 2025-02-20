@@ -6,15 +6,15 @@ import pytest
 import shutil
 from unittest.mock import patch
 
-from ae.base import CFG_EXT, INI_EXT, PY_CACHE_FOLDER, TESTS_FOLDER, app_name_guess, os_platform, write_file
+from ae.base import (CFG_EXT, INI_EXT, PY_CACHE_FOLDER, TESTS_FOLDER,
+                     app_name_guess, format_given, os_platform, write_file)
 from ae.files import read_file_text, write_file_text, CachedFile, RegisteredFile
 from ae.paths import (PATH_PLACEHOLDERS,
                       add_common_storage_paths, app_data_path, app_docs_path, coll_folders, coll_items,
-                      copy_files, move_files,
-                      normalize, path_files, path_folders, path_items, path_join, path_match, path_name,
-                      paths_match, placeholder_key,
-                      placeholder_path,
-                      series_file_name, skip_py_cache_files, user_data_path, user_docs_path, Collector, FilesRegister)
+                      copy_files, move_files, normalize, path_files, path_folders, path_items, path_join, path_match,
+                      path_name, paths_match, placeholder_key, placeholder_path, series_file_name, skip_py_cache_files,
+                      user_data_path, user_docs_path,
+                      Collector, FilesRegister)
 
 
 file_root = 'TstRootFolder'
@@ -225,6 +225,7 @@ class TestPlaceholders:
         assert placeholder_key(f_name) == ""
         assert placeholder_key(file_path) == "cwd"
         assert placeholder_key(file_path).format(**PATH_PLACEHOLDERS) == "cwd"
+        assert format_given(placeholder_key(file_path), PATH_PLACEHOLDERS) == "cwd"
 
     def test_placeholder_path(self):
         f_name = "test.tst"
@@ -232,6 +233,7 @@ class TestPlaceholders:
         assert placeholder_path(f_name) == f_name
         assert placeholder_path(file_path) == "{cwd}" + os.path.sep + f_name
         assert placeholder_path(file_path).format(**PATH_PLACEHOLDERS) == file_path
+        assert format_given(placeholder_path(file_path), PATH_PLACEHOLDERS) == file_path
         assert normalize(placeholder_path(file_path)) == file_path
 
 
