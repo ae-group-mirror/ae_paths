@@ -263,11 +263,14 @@ from functools import partial
 from pathlib import PurePath
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Type, Union, cast
 
-from ae.base import PY_CACHE_FOLDER, app_name_guess, env_str, norm_path, os_platform        # type: ignore
+from ae.base import (                                                                       # type: ignore
+    PY_CACHE_FOLDER, app_name_guess, env_str, format_given, norm_path,
+    os_path_basename, os_path_dirname, os_path_expanduser, os_path_isdir, os_path_isfile, os_path_join,
+    os_path_relpath, os_path_sep, os_path_splitext, os_platform)
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile                 # type: ignore
 
 
-__version__ = '0.3.35'
+__version__ = '0.3.36'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
@@ -304,7 +307,7 @@ def coll_item_type(item_path: str) -> CollYieldType:
     :param item_path:           file/folder path string.
     :return:                    COLLECTED_FOLDER for folders, the file extension for files or None if not found.
     """
-    return COLLECTED_FOLDER if os.path.isdir(item_path) else os.path.splitext(item_path)[1]
+    return COLLECTED_FOLDER if os_path_isdir(item_path) else os_path_splitext(item_path)[1]
 
 
 def coll_items(item_mask: str,
@@ -360,7 +363,7 @@ def coll_files(file_mask: str, file_class: Union[Type[Any], Callable] = str, **f
     :param file_kwargs:         additional/optional kwargs apart from file name passed onto the used item_class.
     :return:                    list of files of the class specified by :paramref:`~coll_files.file_mask`.
     """
-    yield from coll_items(file_mask, selector=os.path.isfile, creator=file_class, **file_kwargs)
+    yield from coll_items(file_mask, selector=os_path_isfile, creator=file_class, **file_kwargs)
 
 
 def coll_folders(folder_mask: str, folder_class: Union[Type[Any], Callable] = str, **folder_kwargs) -> CollYieldItems:
@@ -373,7 +376,7 @@ def coll_folders(folder_mask: str, folder_class: Union[Type[Any], Callable] = st
     :param folder_kwargs:       additional/optional kwargs apart from file name passed onto the used item_class.
     :return:                    list of folders of the class specified by :paramref:`~coll_folders.folder_mask`.
     """
-    yield from coll_items(folder_mask, selector=os.path.isdir, creator=folder_class, **folder_kwargs)
+    yield from coll_items(folder_mask, selector=os_path_isdir, creator=folder_class, **folder_kwargs)
 
 
 def add_common_storage_paths():
@@ -414,15 +417,15 @@ def add_common_storage_paths():
     if os_platform == 'linux':
         places = ('/mnt', '/media')
         for place in places:
-            if os.path.isdir(place):
+            if os_path_isdir(place):
                 for directory in next(os.walk(place))[1]:
-                    PATH_PLACEHOLDERS[directory] = os.path.join(place, directory)
+                    PATH_PLACEHOLDERS[directory] = os_path_join(place, directory)
 
     elif os_platform in ('darwin', 'ios'):      # pragma: no cover
         vol = '/Volume'
-        if os.path.isdir(vol):
+        if os_path_isdir(vol):
             for drive in next(os.walk(vol))[1]:
-                PATH_PLACEHOLDERS[drive] = os.path.join(vol, drive)
+                PATH_PLACEHOLDERS[drive] = os_path_join(vol, drive)
 
     elif os_platform in ('win32', 'cygwin'):    # pragma: no cover
         from ctypes import windll, create_unicode_buffer
@@ -430,8 +433,8 @@ def add_common_storage_paths():
         bitmask = windll.kernel32.GetLogicalDrives()
         get_volume_information = windll.kernel32.GetVolumeInformationW
         for letter in string.ascii_uppercase:
-            drive = letter + ':' + os.path.sep
-            if bitmask & 1 and os.path.isdir(drive):
+            drive = letter + ':' + os_path_sep
+            if bitmask & 1 and os_path_isdir(drive):
                 buf_len = 64
                 name = create_unicode_buffer(buf_len)
                 get_volume_information(drive, name, buf_len, None, None, None, None, 0)
@@ -446,7 +449,7 @@ def app_data_path() -> str:
 
     :return:                    path string of the user app data folder.
     """
-    return os.path.join(user_data_path(), PATH_PLACEHOLDERS.get('main_app_name', PATH_PLACEHOLDERS['app_name']))
+    return os_path_join(user_data_path(), PATH_PLACEHOLDERS.get('main_app_name', PATH_PLACEHOLDERS['app_name']))
 
 
 def app_docs_path() -> str:
@@ -456,7 +459,7 @@ def app_docs_path() -> str:
 
     :return:                    path string of the user documents app folder.
     """
-    return os.path.join(user_docs_path(), PATH_PLACEHOLDERS.get('main_app_name', PATH_PLACEHOLDERS['app_name']))
+    return os_path_join(user_docs_path(), PATH_PLACEHOLDERS.get('main_app_name', PATH_PLACEHOLDERS['app_name']))
 
 
 copy_file = shutil.copy2
@@ -479,8 +482,8 @@ move_tree = shutil.move
 def copy_files(src_folder: str, dst_folder: str, overwrite: bool = False, copier: Callable = copy_file) -> List[str]:
     """ copy files from src_folder into optionally created dst_folder, optionally overwriting destination files.
 
-    :param src_folder:          path to source folder/directory where the files get copied from. placeholders in
-                                :data:`PATH_PLACEHOLDERS` will be recognized and substituted.
+    :param src_folder:          path to source folder/directory where the files get copied from. only the placeholders
+                                mapped in :data:`PATH_PLACEHOLDERS` will be recognized and substituted.
     :param dst_folder:          path to destination folder/directory where the files get copied to. all placeholders in
                                 :data:`PATH_PLACEHOLDERS` are recognized and will be substituted.
     :param overwrite:           pass True to overwrite existing files in the destination folder/directory. on False the
@@ -493,13 +496,14 @@ def copy_files(src_folder: str, dst_folder: str, overwrite: bool = False, copier
 
     updated = []
 
-    if os.path.exists(src_folder):
-        for src_file in glob.glob(os.path.join(src_folder, '**'), recursive=True):
-            if os.path.isfile(src_file):
-                dst_file = norm_path(os.path.join(dst_folder, os.path.relpath(src_file, src_folder)))
-                if overwrite or not os.path.exists(dst_file):
-                    dst_sub_dir = os.path.dirname(dst_file)
-                    if not os.path.exists(dst_sub_dir):
+    if os_path_isdir(src_folder):
+        for src_file in glob.glob(os_path_join(src_folder, '**'), recursive=True):
+            if os_path_isfile(src_file):
+                dst_path = format_given(os_path_relpath(src_file, src_folder), PATH_PLACEHOLDERS)
+                dst_file = norm_path(os_path_join(dst_folder, dst_path))
+                if overwrite or not os_path_isfile(dst_file):
+                    dst_sub_dir = os_path_dirname(dst_file)
+                    if not os_path_isdir(dst_sub_dir):
                         os.makedirs(dst_sub_dir)
                     updated.append(copier(src_file, dst_file))
 
@@ -541,7 +545,7 @@ def normalize(path: str, make_absolute: bool = True, remove_base_path: str = "",
                                 path and neither :paramref:`~normalize.make_absolute` nor
                                 :paramref:`~normalize.resolve_sym_links` is `True`.
     """
-    return norm_path(path.format(**PATH_PLACEHOLDERS),
+    return norm_path(format_given(path, PATH_PLACEHOLDERS),
                      make_absolute=make_absolute,
                      remove_base_path=remove_base_path,
                      remove_dots=remove_dots,
@@ -559,7 +563,7 @@ def path_files(file_mask: str, file_class: Union[Type[Any], Callable] = str, **f
     :param file_kwargs:         additional/optional kwargs apart from file name passed onto the used item_class.
     :return:                    list of files of the class specified by :paramref:`~path_files.file_mask`.
     """
-    return path_items(file_mask, selector=os.path.isfile, creator=file_class, **file_kwargs)
+    return path_items(file_mask, selector=os_path_isfile, creator=file_class, **file_kwargs)
 
 
 def path_folders(folder_mask: str, folder_class: Union[Type[Any], Callable] = str, **folder_kwargs) -> List[Any]:
@@ -572,7 +576,7 @@ def path_folders(folder_mask: str, folder_class: Union[Type[Any], Callable] = st
     :param folder_kwargs:       additional/optional kwargs apart from file name passed onto the used item_class.
     :return:                    list of folders of the class specified by :paramref:`~path_folders.folder_mask`.
     """
-    return path_items(folder_mask, selector=os.path.isdir, creator=folder_class, **folder_kwargs)
+    return path_items(folder_mask, selector=os_path_isdir, creator=folder_class, **folder_kwargs)
 
 
 def path_items(item_mask: str, selector: Callable[[str], Any] = str,
@@ -617,8 +621,8 @@ def path_join(*parts: str) -> str:
 
         even if you import :func:`os.path.join` without the namespace prefixes, like this::
 
-            from os.path import join as os_join
-            os_secs = timeit.timeit('os_join("test", "sub_test", "sub_sub_test")', globals=globals())
+            from os.path import join as path_join
+            os_secs = timeit.timeit('path_join("test", "sub_test", "sub_sub_test")', globals=globals())
             assert paths_secs < os_secs
     """
     assert parts, "missing required positional argument(s) with path parts to join"
@@ -737,14 +741,14 @@ def series_file_name(file_path: str, digits: int = 2, marker: str = " ", create:
     :param create:              pass True to create the file (to reserve the series index).
     :return:                    file path extended with unique/new series index.
     """
-    path_stem, ext = os.path.splitext(file_path)
+    path_stem, ext = os_path_splitext(file_path)
     path_stem += marker
 
     found_files = glob.glob(path_stem + "*" + ext)
     index = len(found_files) + 1
     while True:
         file_path = path_stem + format(index, "0" + str(digits)) + ext
-        if not os.path.exists(file_path):
+        if not os_path_isfile(file_path):
             break
         index += 1
 
@@ -788,12 +792,12 @@ def user_data_path() -> str:
         if os_platform == 'ios':
             data_path = 'Documents'
         elif os_platform == 'darwin':
-            data_path = os.path.join('Library', 'Application Support')
+            data_path = os_path_join('Library', 'Application Support')
         else:                                       # platform == 'linux' or 'freebsd' or anything else
             data_path = env_str('XDG_CONFIG_HOME') or '.config'
 
         if not os.path.isabs(data_path):
-            data_path = os.path.expanduser(os.path.join('~', data_path))
+            data_path = os_path_expanduser(os_path_join('~', data_path))
 
     return data_path
 
@@ -812,10 +816,10 @@ def user_docs_path() -> str:
         docs_path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS).getAbsolutePath()
 
     elif os_platform in ('win32', 'cygwin'):
-        docs_path = os.path.join(env_str('USERPROFILE'), 'Documents')
+        docs_path = os_path_join(env_str('USERPROFILE'), 'Documents')
 
     else:
-        docs_path = os.path.expanduser(os.path.join('~', 'Documents'))
+        docs_path = os_path_expanduser(os_path_join('~', 'Documents'))
 
     return docs_path
 
@@ -878,13 +882,13 @@ class Collector:
 
     def _collect_appends(self, prefix: str, appends: Tuple[str, ...], only_first_of: Tuple[str, ...]):
         for suffix in appends:
-            mask = path_join(prefix, suffix).format(**self.placeholders)
+            mask = format_given(path_join(prefix, suffix), self.placeholders)
             if self.check_add(mask) and 'append' in only_first_of:
                 return
 
     def _collect_selects(self, prefix: str, selects: Tuple[str, ...], only_first_of: Tuple[str, ...]):
         for suffix in selects:
-            mask = path_join(prefix, suffix).format(**self.placeholders)
+            mask = format_given(path_join(prefix, suffix), self.placeholders)
             if not self.check_add(mask, select=True):
                 self.failed += 1
                 self.prefix_failed[prefix] += 1
@@ -994,7 +998,7 @@ class FilesRegister(dict):
                                 values greater than n (==len(file_list)) will append the file_obj to the end of the file
                                 object list and values less than n-1 will insert the file_obj to the start of the file.
         """
-        name = os.path.splitext(os.path.basename(file_obj))[0] if isinstance(file_obj, str) else file_obj.stem
+        name = os_path_splitext(os_path_basename(file_obj))[0] if isinstance(file_obj, str) else file_obj.stem
         if name in self:
             list_len = len(self[name])
             if first_index < 0:
