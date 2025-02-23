@@ -270,7 +270,7 @@ from ae.base import (                                                           
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile                 # type: ignore
 
 
-__version__ = '0.3.36'
+__version__ = '0.3.37'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
@@ -727,8 +727,8 @@ def placeholder_path(path: str) -> str:
     """
     for key in sorted(PATH_PLACEHOLDERS, key=lambda k: len(PATH_PLACEHOLDERS[k]), reverse=True):
         val = PATH_PLACEHOLDERS[key]
-        if path.startswith(val):
-            return "{" + key + "}" + path[len(val):]
+        if path == val or path.startswith(val + os_path_sep):
+            return '{' + key + '}' + path[len(val):]
     return path
 
 
