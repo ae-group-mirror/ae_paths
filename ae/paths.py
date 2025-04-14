@@ -261,7 +261,7 @@ import sys
 from collections import defaultdict
 from functools import partial
 from pathlib import PurePath
-from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Type, Union, cast
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Type, Union
 
 from ae.base import (                                                                       # type: ignore
     PY_CACHE_FOLDER, app_name_guess, env_str, format_given, norm_path,
@@ -270,7 +270,7 @@ from ae.base import (                                                           
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile                 # type: ignore
 
 
-__version__ = '0.3.37'
+__version__ = '0.3.38'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
@@ -311,7 +311,7 @@ def coll_item_type(item_path: str) -> CollYieldType:
 
 
 def coll_items(item_mask: str,
-               searcher: SearcherType = cast(SearcherType, partial(glob.glob, recursive=True)),
+               searcher: SearcherType = partial(glob.glob, recursive=True),
                selector: Callable[[CollArgType], Union[bool, Any]] = str,
                type_detector: Callable[[CollArgType], CollYieldType] = coll_item_type,
                creator: Callable[[CollArgType], CollCreatorReturnType] = str,  # mypy lacks **creator_kwargs in Callable
@@ -403,16 +403,19 @@ def add_common_storage_paths():
     * `MS Windows`: additional drives mapped as the drive partition name.
 
     """
-    from plyer import storagepath                              # type: ignore  # pylint: disable=import-outside-toplevel
+    try:
+        from plyer import storagepath                          # type: ignore  # pylint: disable=import-outside-toplevel
 
-    for attr in dir(storagepath):
-        if attr.startswith('get_') and attr.endswith('_dir'):
-            try:
-                path = getattr(storagepath, attr)()
-                if isinstance(path, str):  # e.g. get_sdcard_dir() returns None in Android device w/o inserted sdcard
-                    PATH_PLACEHOLDERS[attr[4:-4]] = path
-            except (AttributeError, NotImplementedError, FileNotFoundError, Exception):
-                pass
+        for attr in dir(storagepath):
+            if attr.startswith('get_') and attr.endswith('_dir'):
+                try:
+                    path = getattr(storagepath, attr)()
+                    if isinstance(path, str):   # get_sdcard_dir() returns None in Android device w/o inserted sdcard
+                        PATH_PLACEHOLDERS[attr[4:-4]] = path
+                except (AttributeError, NotImplementedError, Exception):        # pylint: disable=broad-exception-caught
+                    pass
+    except (ModuleNotFoundError, ImportError):                                  # pragma: no cover
+        pass
 
     if os_platform == 'linux':
         places = ('/mnt', '/media')
@@ -421,25 +424,28 @@ def add_common_storage_paths():
                 for directory in next(os.walk(place))[1]:
                     PATH_PLACEHOLDERS[directory] = os_path_join(place, directory)
 
-    elif os_platform in ('darwin', 'ios'):      # pragma: no cover
+    elif os_platform in ('darwin', 'ios'):                                      # pragma: no cover
         vol = '/Volume'
         if os_path_isdir(vol):
             for drive in next(os.walk(vol))[1]:
                 PATH_PLACEHOLDERS[drive] = os_path_join(vol, drive)
 
-    elif os_platform in ('win32', 'cygwin'):    # pragma: no cover
-        from ctypes import windll, create_unicode_buffer
+    elif os_platform in ('win32', 'cygwin'):                              # pragma: no cover
+        try:
+            from ctypes import windll, create_unicode_buffer              # pylint: disable=import-outside-toplevel
 
-        bitmask = windll.kernel32.GetLogicalDrives()
-        get_volume_information = windll.kernel32.GetVolumeInformationW
-        for letter in string.ascii_uppercase:
-            drive = letter + ':' + os_path_sep
-            if bitmask & 1 and os_path_isdir(drive):
-                buf_len = 64
-                name = create_unicode_buffer(buf_len)
-                get_volume_information(drive, name, buf_len, None, None, None, None, 0)
-                PATH_PLACEHOLDERS[name.value] = drive
-            bitmask >>= 1
+            bitmask = windll.kernel32.GetLogicalDrives()
+            get_volume_information = windll.kernel32.GetVolumeInformationW
+            for letter in string.ascii_uppercase:
+                drive = letter + ':' + os_path_sep
+                if bitmask & 1 and os_path_isdir(drive):
+                    buf_len = 64
+                    name = create_unicode_buffer(buf_len)
+                    get_volume_information(drive, name, buf_len, None, None, None, None, 0)
+                    PATH_PLACEHOLDERS[name.value] = drive
+                bitmask >>= 1
+        except (ModuleNotFoundError, ImportError):
+            pass
 
 
 def app_data_path() -> str:
@@ -667,11 +673,11 @@ def path_match(path: str, mask: str) -> bool:
                                 specified by the :paramref:`~path_match.mask` argument.
     """
     if sys.version_info < (3, 13):
-        re_mask = _path_match_replacement.sub(lambda _m: _path_match_tokens_to_re[_m.group(0)], re.escape(mask))
+        re_mask = _path_match_replacement.sub(lambda match: _path_match_tokens_to_re[match.group(0)], re.escape(mask))
         match = bool(re.fullmatch(re_mask, path))
     else:
         # noinspection PyUnresolvedReferences
-        match = PurePath(path).full_match(mask)                 # pragma: no cover
+        match = PurePath(path).full_match(mask)                 # pragma: no cover # pylint: disable=no-member
     return match
 
 
@@ -753,7 +759,7 @@ def series_file_name(file_path: str, digits: int = 2, marker: str = " ", create:
         index += 1
 
     if create:
-        open(file_path, 'w').close()
+        open(file_path, 'w').close()        # pylint: disable=consider-using-with, unspecified-encoding
 
     return file_path
 
