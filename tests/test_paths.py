@@ -336,8 +336,8 @@ DIR1 = "app_dir"
 FILE1 = "app.png"
 CONTENT1 = "TEST FILE1 CONTENT"
 
-MOVES_SRC_FOLDER_NAME = "tst_move_path_source"
-OVERWRITES_SRC_FOLDER_NAME = "tst_overwrite_path_source"
+TST_MOVE_FOLDER_NAME = "tst_ae_paths_src"
+TST_OVER_FOLDER_NAME = "tst_ae_paths_over_src"
 
 
 @pytest.fixture
@@ -358,7 +358,7 @@ def files_to_test():
     shutil.rmtree(file_root)
 
 
-@pytest.fixture(params=[MOVES_SRC_FOLDER_NAME, OVERWRITES_SRC_FOLDER_NAME])
+@pytest.fixture(params=[TST_MOVE_FOLDER_NAME, TST_OVER_FOLDER_NAME])
 def files_to_move(request, tmpdir):
     """ create test files in source directory to be moved and/or overwritten. """
     src_dir = tmpdir.mkdir(request.param)
@@ -383,7 +383,7 @@ class TestCopyFiles:
         for src_file_path in files_to_move:
             assert os.path.exists(src_file_path)
             assert not os.path.exists(os.path.join(dst_dir, os.path.relpath(src_file_path, src_dir)))
-        tst_overwrite = (OVERWRITES_SRC_FOLDER_NAME in src_dir)
+        tst_overwrite = (TST_OVER_FOLDER_NAME in src_dir)
 
         copy_files(src_dir, dst_dir, overwrite=tst_overwrite)
 
@@ -402,7 +402,7 @@ class TestCopyFiles:
             assert os.path.exists(src_file_path)
             dst_file = os.path.join(dst_dir, os.path.relpath(src_file_path, src_dir))
             assert dst_file == dst_block_file or not os.path.exists(dst_file)
-        tst_overwrite = (OVERWRITES_SRC_FOLDER_NAME in src_dir)
+        tst_overwrite = (TST_OVER_FOLDER_NAME in src_dir)
 
         copy_files(src_dir, dst_dir, overwrite=tst_overwrite)
 
@@ -426,7 +426,7 @@ class TestMoveFiles:
         for src_file_path in files_to_move:
             assert os.path.exists(src_file_path)
             assert not os.path.exists(os.path.join(dst_dir, os.path.relpath(src_file_path, src_dir)))
-        tst_overwrite = (OVERWRITES_SRC_FOLDER_NAME in src_dir)
+        tst_overwrite = (TST_OVER_FOLDER_NAME in src_dir)
 
         move_files(src_dir, dst_dir, overwrite=tst_overwrite)
 
@@ -445,7 +445,7 @@ class TestMoveFiles:
             assert os.path.exists(src_file_path)
             dst_file = os.path.join(dst_dir, os.path.relpath(src_file_path, src_dir))
             assert dst_file == dst_block_file or not os.path.exists(dst_file)
-        tst_overwrite = (OVERWRITES_SRC_FOLDER_NAME in src_dir)
+        tst_overwrite = (TST_OVER_FOLDER_NAME in src_dir)
 
         move_files(src_dir, dst_dir, overwrite=tst_overwrite)
 
@@ -467,7 +467,7 @@ class TestMoveFiles:
         for src_file_path in files_to_move:
             assert os.path.exists(src_file_path)
             assert not os.path.exists(os.path.join(dst_dir, os.path.relpath(src_file_path, src_dir)))
-        tst_overwrite = (OVERWRITES_SRC_FOLDER_NAME in src_dir)
+        tst_overwrite = (TST_OVER_FOLDER_NAME in src_dir)
 
         move_files(src_dir, dst_dir, overwrite=tst_overwrite)
 
@@ -486,7 +486,7 @@ class TestMoveFiles:
             assert os.path.exists(src_file_path)
             dst_file = os.path.join(dst_dir, os.path.relpath(src_file_path, src_dir))
             assert dst_file == dst_block_file or not os.path.exists(dst_file)
-        tst_overwrite = (OVERWRITES_SRC_FOLDER_NAME in src_dir)
+        tst_overwrite = (TST_OVER_FOLDER_NAME in src_dir)
 
         move_files(src_dir, dst_dir, overwrite=tst_overwrite)
 
