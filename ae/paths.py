@@ -5,13 +5,13 @@ generic file path helpers
 this pure python namespace portion is providing useful :ref:`path helper functions` as well as
 :ref:`generic system paths` for most platforms, like e.g.:
 
-    * android OS
+    * Android OS
     * iOS
-    * linux
-    * macOS
-    * Windows
+    * Linux
+    * Mac OS X
+    * MS Windows
 
-the only external hard dependency of this module are the ae namespace portions :mod:`ae.base` and :mod:`ae.files`.
+the only external hard dependencies of this module are the ae namespace portions :mod:`ae.base` and :mod:`ae.files`.
 optional dependencies are:
 
     * on android OS the PyPi package `jnius`, needed by the functions :func:`user_data_path` and :func:`user_docs_path`.
@@ -22,24 +22,25 @@ path helper functions
 ---------------------
 
 the generator functions :func:`coll_files`, :func:`coll_folders` and :func:`coll_items` are building the fundament
-for most of the file and folder collection functionality, provided by this module. for example the function
-:func:`path_files` is using these generators to determine the files within a folder structure that are matching
-the specified wildcards and :ref:`path part placeholders <generic system paths>`. similarly the
+for most of the file and folder collection functionality, provided by this module.
+
+the function :func:`path_files` is using these generators to determine the files within a folder structure that are
+matching the specified wildcards and :ref:`path part placeholders <generic system paths>`. similarly the
 function :func:`path_folders` for folders, and :func:`path_items` to collect both, file and folder names.
 
 use the functions :func:`copy_files` and :func:`move_files` to duplicate and move multiple files or entire
 file path trees. these two functions are based on :func:`copy_file` and :func:`move_file`.
-the functions :func:`copy_tree` and :func:`move_tree` providing an alternative way to copy or move
+the functions :func:`copy_tree` and :func:`move_tree` provide an alternative way to copy or move
 entire directory trees.
 
 the helper function :func:`normalize` converts path strings containing path placeholders into regular path strings,
-resolving symbolic links, or is converting paths string from absolute paths to relative paths and vice versa.
+resolving symbolic links, or is converting a path string from absolute paths to relative paths and vice versa.
 
 to determine if the path of a file or folder is matching a glob-like path pattern/mask with wildcards, the
-functions :func:`path_match` and :func:`paths_match` can be used. useful specially for cases where you don't
+functions :func:`path_match` and :func:`paths_match` can be used. useful especially for cases where you don't
 have direct access to the file system.
 
-file paths for series of files, e.g. for logging, can be determined via the :func:`series_file_name` function.
+file paths for series of files, e.g., for logging, can be determined via the :func:`series_file_name` function.
 
 the function :func:`skip_py_cache_files` can be used in path file collections to skip the files situated in the
 Python cache folder (:data:`~ae.base.PY_CACHE_FOLDER` respectively ``__pycache__``).
@@ -50,12 +51,12 @@ generic system paths
 
 generic system paths are determined by the following helper functions:
 
-* :func:`app_data_path`: application data path.
-* :func:`app_docs_path`: application documents path.
-* :func:`user_data_path`: user data path.
-* :func:`user_docs_path`: user documents path.
+* :func:`app_data_path`: the application data path.
+* :func:`app_docs_path`: the application documents path.
+* :func:`user_data_path`: the user data path.
+* :func:`user_docs_path`: the user documents path.
 
-these system paths together with additional generic paths like e.g. the current working directory, storage paths
+these system paths together with additional generic paths like e.g., the current working directory, storage paths
 provided by the `plyer` package, or user and application paths, are provided as `path placeholders`, which get
 stored within the :data:`PATH_PLACEHOLDERS` dict by calling the function :func:`add_common_storage_paths`.
 
@@ -68,15 +69,15 @@ file/folder collection and classification
 
 more complex collections of files and folder paths, and the grouping of them, can be done
 with the classes :class:`Collector`, described in the underneath section :ref:`collecting files`,
-and :class:`FilesRegister`, described in the section :ref:`files register`.
+and :class:`FilesRegister`, described in the section :ref:`file register`.
 
 use the :ref:`Collector class <collecting files>` for temporary quick file path searches on your
-local file systems as well as on remote servers/hosts. one implementation example is e.g. the method
+local file systems as well as on remote servers/hosts. one implementation example is e.g., the method
 :meth:`~aedev.pythonanywhere.PythonanywhereApi.deployed_code_files` of the :mod:`aedev.pythonanywhere` module.
 
-the class :ref:`FilesRegister <files register>` helps you to create and cache file path
+the class :ref:`FilesRegister <file register>` helps you to create and cache file path
 registers permanently, to quickly find at any time the best fitting match for a requested purpose.
-for example the :mod:`~ae.gui_app` module is using it to dynamically select
+for example, the :mod:`~ae.gui_app` module is using it to dynamically select
 image/font/audio/... resource files depending on the current user preferences, hardware
 and/or software environment.
 
@@ -84,7 +85,7 @@ and/or software environment.
 collecting files
 ^^^^^^^^^^^^^^^^
 
-to collect file names in the current working directory create an instance of the :class:`Collector` class and call
+to collect file names in the current working directory, create an instance of the :class:`Collector` class and call
 its :meth:`~Collector.collect` method with a file or folder path, which can contain wildcards::
 
     from ae.paths import Collector
@@ -106,7 +107,7 @@ the following statement is equivalent to the last example::
 
     image_files_list = Collector().collect('*.png').collect('*.jpg').files
 
-by specifying the ``**`` wildcard entire folder trees can be scanned. the following example is collection all
+by specifying the ``**`` wildcard entire folder trees can be scanned. the following example is a collection of all
 the files, including the hidden ones, in the folder tree under the current working directory::
 
     test_files = Collector().collect('**/*').collect('**/.*').files
@@ -138,15 +139,15 @@ _______________________________
 
 in a single call of :meth:`~Collector.collect`, providing the method parameters :paramref:`~Collector.collect.append`
 or :paramref:`~Collector.collect.select`, you can scan multiple combinations of path prefixes and suffixes, which can
-both contain wildcards and folder names, whereas the suffixes containing also parts of the file names to search for.
+both contain wildcards and folder names, whereas the suffixes contain also parts of the file names to search for.
 
 .. hint:: the wildcards `*`, `**` and `?` are allowed in the prefixes as well as in suffixes.
 
-the resulting file paths are relative or absolute, depending on if the specified prefix(es) containing
+the resulting file paths are relative or absolute, depending on whether the specified prefix(es) contains
 absolute or relative paths.
 
 in the following example determines the relative paths of all folders directly underneath the current working directory
-with a name that contains the string `'xxx'` or is starting with `'yyy'` or is ending with  `'zzz'`::
+with a name that contains the string `'xxx'` or is starting with `'yyy'` or is ending with `'zzz'`::
 
     coll = Collector(item_collector=coll_folders)
     coll.collect('', append=('*xxx*', 'yyy*', '*zzz'))
@@ -154,47 +155,38 @@ with a name that contains the string `'xxx'` or is starting with `'yyy'` or is e
 
 .. hint:: replace empty string in the first argument of :meth:`~Collector.collect` with '{cwd}' to get absolute paths.
 
-the following example is collecting the absolute paths of files with the name `xxx.cfg` from the first found
-location/folder, starting to search in the current working directory, then in the folder above the application
-data folder, and finally in a folder with the name of the main application underneath the user data folder::
+the following example is collecting the absolute paths of files with the name `xxx.cfg` from all the found
+locations/folders, starting to search in the current working directory ({cwd}), then in the folder above the application
+data folder ({app}), and finally in a folder with the name of the main application underneath the user data folder::
 
     coll = Collector()
     coll.collect("{cwd}", "{app}/..", "{usr}/{main_app_name}", append="xxx.cfg")
     found_files = coll.files
 
-to set or change the generic path placeholder parts values, e.g. of the main application name (`{main_app_name}`) and
-the application data path (`{app}`), you simply specify their corresponding values as kwargs in the construction
-of the :class:`Collector` instance::
+to overwrite some of the generic path placeholder parts values only for a specific :class:`Collector` instance, e.g.,
+the main application name (`{main_app_name}`) and the application data path (`{app}`), you simply specify the changed
+values as kwargs in the construction of the :class:`Collector` instance::
 
     coll = Collector(main_app_name=..., app=...)
 
-additionally you can specify any other path placeholders that will be automatically used and replaced by the
-:class:`Collector` instance::
+additionally, you can specify any other path placeholders that will be automatically used and replaced in the arguments
+of the :meth:`~Collector.collect` method for a so prepared :class:`Collector` instance::
 
     coll = Collector(any_other_placeholder=...)
 
-by default only the found file(s)/folder(s) of the first combination will be collected. to collect all files instead,
-pass an empty tuple to the method argument :paramref:`~Collector.collect.only_first_of` of :meth:`~Collector.collect`::
-
-    coll.collect(..., append=..., [select=..., ] only_first_of=())
-
-add one of the strings `'prefix'`, `'append'` or `'select'` to the :paramref:`~Collector.collect.only_first_of` tuple
-argument to collect only the files/folders of the first combination of the specified prefixes, append-suffixes
-and select-suffixes.
-
-by using the :paramref:`~Collector.collect.select` argument the found files and folders will additionally be collected
+by using the :paramref:`~Collector.collect.select` argument, the found files and folders will additionally be collected
 in the :class:`Collector` instance attribute :attr:`~Collector.selected`.
 
-combinations collected via the :paramref:`~Collector.collect.select` argument that are not existing will be logged.
+not existing combinations collected via the :paramref:`~Collector.collect.select` argument will be logged.
 the results are provided by the instance attributes :attr:`~Collector.failed`, :attr:`~Collector.prefix_failed` and
 :attr:`~Collector.suffix_failed`.
 
 
-files register
-^^^^^^^^^^^^^^
+file register
+^^^^^^^^^^^^^
 
-a files register is an instance of the :class:`FilesRegister`, providing property based file collection and selection,
-which is e.g. used by the :mod:`ae.gui_app` ae namespace portion to find and select resource files like icon/image or
+a file register is an instance of the :class:`FilesRegister`, providing a property-based file collection and selection,
+which is e.g., used by the :mod:`ae.gui_app` ae namespace portion to find and select resource files like icon/image or
 sound files.
 
 files can be collected from various places by a single instance of the class :class:`FilesRegister`::
@@ -206,14 +198,14 @@ files can be collected from various places by a single instance of the class :cl
 
     registered_file = file_reg.find_file('file_name')
 
-in this example the :class:`FilesRegister` instance collects all files that are existing in any sub-folders underneath
-the two provided paths. then the :meth:`~FilesRegister.find_file` method will return a file object of type
-:class:`~ae.files.RegisteredFile` of the last collected file with the stem (base name w/o extension) `'file_name'`.
+in this example the :class:`FilesRegister` instance collects all files that are existing in any subfolders underneath
+the two provided paths. then the :meth:`~FilesRegister.find_file` method will return a :class:`~ae.files.RegisteredFile`
+instance of the last collected file with the stem (base name w/o extension) `'file_name'`.
 
-multiple files with the same stem can be collected and registered e.g. with different formats, to be selected by
-the app by their different properties, which are specified in the folder names underneath the collected paths.
-assuming your application is providing an icon image in two sizes, provided
-within the following folder structure, situated in the current working directory::
+multiple files with the same stem can be collected and registered e.g., with different formats, to be selected by
+properties, which are specified in the folder names of the collected file paths.
+
+for example, the following folder tree contains icon images in two sizes::
 
     resources/
         size_72/
@@ -221,26 +213,30 @@ within the following folder structure, situated in the current working directory
         size_150/
             app_icon.png
 
-when you then create an instance of :class:`FilesRegister` both image files from the `resources` folder will get
-registered, interpreting the sub-folder names (`size_*`) as properties or attributes for the registered files,
-where `size` will result as the property name and the string after the underscore as the property value.
-
-to retrieve the paths of the application image file with the size ``72``, call the
-:meth:`~FilesRegister.find_file` method::
+when you then create an instance of :class:`FilesRegister` both image files underneath the `resources` folder will get
+registered, interpreting the subfolder names (`size_*`) as properties or attributes for the registered files,
+where `size` will result as the property name and the string after the underscore as the property value::
 
     file_reg = FilesRegister('resources')
+
+now, to retrieve the paths of the application image file with the size ``72``, call the
+:meth:`~FilesRegister.find_file` method, specifying the property name(s) and value(s) as the second argument::
+
     app_icon_image_path = file_reg.find_file('app_icon', dict(size=72))
 
-as a shortcut you can alternatively call the object directly (leaving `.find_file` away)::
+the file path in `app_icon_image_path` will then result as `"resources/size_72/app_icon.jpg"`.
+
+alternatively, and as a shortcut, you can call the instance object directly (leaving the explicit `.find_file`
+method away), like this::
 
     app_icon_image_path = file_reg('app_icon', dict(size=150))
 
-the resulting file path in `app_icon_image_path` will be `"resources/size_72/app_icon.jpg"` in the penultimate example
-and `"resources/size_150/app_icon.png"` in the last example.
+the resulting file path in `app_icon_image_path` of the last example will now result as
+"resources/size_150/app_icon.png"`, because this time the size property value got specified as `150`.
 
-an instance of :class:`FilesRegister` (`file_reg`) behaves like a dict object, where the item key is the file stem
-('app_icon') and the item value is a list of instances of :class:`~ae.files.RegisteredFile`. both files in the
-resources folder are provided as one dict item::
+additionally, an instance of :class:`FilesRegister` (`file_reg`) behaves like a dict object, where the item key is the
+file stem ('app_icon') and the item value is a list of instances of :class:`~ae.files.RegisteredFile`. both files
+in the resources folder are provided as one dict item::
 
     file_reg = FilesRegister('resources')
     assert 'app_icon' in file_reg
@@ -270,7 +266,7 @@ from ae.base import (                                                           
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile                 # type: ignore
 
 
-__version__ = '0.3.38'
+__version__ = '0.3.39'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
@@ -321,21 +317,21 @@ def coll_items(item_mask: str,
 
     :param item_mask:           file path mask with optional :func:`~glob.glob` wildcards, the '~' shortcut for the
                                 home folder path and any :data:`path placeholders <PATH_PLACEHOLDERS>`, which is
-                                specifying the files/folders to collect. use the '**' glob as path to include
-                                also items from sub-folders deeper than one level.
-    :param searcher:            callable to convert|resolve path with optional wildcards in
-                                :paramref:`~coll_items.item_mask` into multiple item file/folder path strings.
+                                specifying the files/folders to collect. use the '**' glob wildcard in a path to include
+                                also items from subfolders deeper than one level.
+    :param searcher:            callable to convert|resolve a path with optional wildcards, specified in
+                                :paramref:`~coll_items.item_mask`, into multiple item file/folder path strings.
     :param type_detector:       callable to typify/classify a found item to be stored in the first tuple items
-                                of the returned list. if not passed then :func:`coll_item_type` will be used.
+                                of the returned list. if not passed, then :func:`coll_item_type` will be used.
     :param selector:            called with each found file/folder name to check if it has to be added to the returned
                                 list. the default argument (str) results in returning every file/folder found by glob().
-    :param creator:             each found file/folder will be passed as argument to this class/callable and the
+    :param creator:             each found file/folder will be passed as an argument to this class/callable, and the
                                 instance/return-value will be appended as an item to the returned item list.
-                                if not passed then the `str` class will be used, which means that the items
+                                if not passed, then the `str` class will be used, which means that the items
                                 of the returned list will be strings of the file/folder path and name.
                                 passing a class, like e.g. :class:`ae.files.CachedFile`, :class:`ae.files.CachedFile`
                                 or :class:`pathlib.Path`, will create instances of this class.
-                                alternatively you can pass a callable which will be called on each found file/folder.
+                                alternatively, you can pass a callable which will be called on each found file/folder.
                                 in this case the return value of the callable will be inserted in the related
                                 item of the returned list.
                                 silly mypy does not support ``Union[Type[Any], Callable[[str, KwArg()], Any]]``.
@@ -357,10 +353,10 @@ def coll_files(file_mask: str, file_class: Union[Type[Any], Callable] = str, **f
     """ determine existing file(s) underneath the folder specified by :paramref:`~coll_files.file_mask`.
 
     :param file_mask:           glob file mask (with optional glob wildcards and :data:`PATH_PLACEHOLDERS`)
-                                specifying the files to collect (by default including the sub-folders).
+                                specifying the files to collect (by default including the subfolders).
     :param file_class:          factory used for the returned list items (see :paramref:`coll_items.creator`).
                                 silly mypy does not support Union[Type[Any], Callable[[str, KwArg()], Any]].
-    :param file_kwargs:         additional/optional kwargs apart from file name passed onto the used item_class.
+    :param file_kwargs:         additional/optional kwargs apart from the file name passed onto the used item_class.
     :return:                    list of files of the class specified by :paramref:`~coll_files.file_mask`.
     """
     yield from coll_items(file_mask, selector=os_path_isfile, creator=file_class, **file_kwargs)
@@ -370,10 +366,10 @@ def coll_folders(folder_mask: str, folder_class: Union[Type[Any], Callable] = st
     """ determine existing folder(s) underneath the folder specified by :paramref:`~coll_folders.folder_mask`.
 
     :param folder_mask:         glob folder mask (with optional glob wildcards and :data:`PATH_PLACEHOLDERS`)
-                                specifying the folders to collect (by default including the sub-folders).
+                                specifying the folders to collect (by default including the subfolders).
     :param folder_class:        class or factory used for the returned list items (see :paramref:`coll_items.creator`).
                                 silly mypy does not support Union[Type[Any], Callable[[str, KwArg()], Any]].
-    :param folder_kwargs:       additional/optional kwargs apart from file name passed onto the used item_class.
+    :param folder_kwargs:       additional/optional kwargs apart from the file name passed onto the used item_class.
     :return:                    list of folders of the class specified by :paramref:`~coll_folders.folder_mask`.
     """
     yield from coll_items(folder_mask, selector=os_path_isdir, creator=folder_class, **folder_kwargs)
@@ -395,11 +391,11 @@ def add_common_storage_paths():
     * `{sdcard}`: SD card root directory (only available in Android if sdcard is inserted).
     * `{videos}`: user videos directory.
 
-    additionally storage paths that are only available on certain OS (inspired by the method `get_drives`, implemented
+    additionally, storage paths that are only available on certain OS (inspired by the method `get_drives`, implemented
     in `<https://github.com/kivy-garden/filebrowser/blob/master/kivy_garden/filebrowser/__init__.py>`_):
 
     * `Linux`: external storage devices/media mounted underneath the system partition root in /mnt or /media.
-    * `Apple Mac OsX or iOS`: external storage devices/media mounted underneath the system partition root in /Volume.
+    * `Apple Mac OS X or iOS`: external storage devices/media mounted underneath the system partition root in /Volume.
     * `MS Windows`: additional drives mapped as the drive partition name.
 
     """
@@ -486,15 +482,15 @@ move_tree = shutil.move
 
 
 def copy_files(src_folder: str, dst_folder: str, overwrite: bool = False, copier: Callable = copy_file) -> List[str]:
-    """ copy files from src_folder into optionally created dst_folder, optionally overwriting destination files.
+    """ copy files from src_folder into an optionally created dst_folder, optionally overwriting destination files.
 
-    :param src_folder:          path to source folder/directory where the files get copied from. only the placeholders
-                                mapped in :data:`PATH_PLACEHOLDERS` will be recognized and substituted.
-    :param dst_folder:          path to destination folder/directory where the files get copied to. all placeholders in
-                                :data:`PATH_PLACEHOLDERS` are recognized and will be substituted.
+    :param src_folder:          path to the source folder / directory where the files get copied from. only the
+                                placeholders mapped in :data:`PATH_PLACEHOLDERS` will be recognized and substituted.
+    :param dst_folder:          path to the destination folder / directory where the files get copied to. all
+                                placeholders in :data:`PATH_PLACEHOLDERS` are recognized and will be substituted.
     :param overwrite:           pass True to overwrite existing files in the destination folder/directory. on False the
-                                files will only get copied if they not exist in the destination.
-    :param copier:              copy/move function with src_file and dst_file parameters, returning file path/name.
+                                files will only get copied if they do not exist in the destination.
+    :param copier:              the copy/move function with src_file and dst_file parameters, returning file path/name.
     :return:                    list of copied files, with their destination path.
     """
     src_folder = normalize(src_folder, make_absolute=False, remove_dots=False, resolve_sym_links=False)
@@ -517,16 +513,16 @@ def copy_files(src_folder: str, dst_folder: str, overwrite: bool = False, copier
 
 
 def move_files(src_folder: str, dst_folder: str, overwrite: bool = False) -> List[str]:
-    """ move files from src_folder into optionally created dst_folder, optionally overwriting destination files.
+    """ move files from src_folder into an optionally created dst_folder, optionally overwriting destination files.
 
-    :param src_folder:          path to source folder/directory where the files get moved from. placeholders in
+    :param src_folder:          path to the source folder / directory where the files get moved from. placeholders in
                                 :data:`PATH_PLACEHOLDERS` will be recognized and substituted.
-                                please note that the source folders itself will neither be moved nor removed (but will
-                                be empty after the operation finished).
-    :param dst_folder:          path to destination folder/directory where the files get moved to. all placeholders in
-                                :data:`PATH_PLACEHOLDERS` are recognized and will be substituted.
+                                please note that the source folder itself will neither be moved nor removed (but will
+                                be empty after the operation is finished).
+    :param dst_folder:          path to the destination folder / directory where the files get moved to. all
+                                placeholders in :data:`PATH_PLACEHOLDERS` are recognized and will be substituted.
     :param overwrite:           pass True to overwrite existing files in the destination folder/directory. on False the
-                                files will only get moved if they not exist in the destination.
+                                files will only get moved if they do not exist in the destination.
     :return:                    list of moved files, with their destination path.
     """
     return copy_files(src_folder, dst_folder, overwrite=overwrite, copier=move_file)
@@ -534,10 +530,10 @@ def move_files(src_folder: str, dst_folder: str, overwrite: bool = False) -> Lis
 
 def normalize(path: str, make_absolute: bool = True, remove_base_path: str = "", remove_dots: bool = True,
               resolve_sym_links: bool = True) -> str:
-    """ normalize/transform path replacing `PATH_PLACEHOLDERS` and the tilde character (for home folder).
+    """ normalize/transform a path replacing `PATH_PLACEHOLDERS` and the tilde character (for home folder).
 
     :param path:                path string to normalize/transform.
-    :param make_absolute:       pass False to not convert path to an absolute path.
+    :param make_absolute:       pass False to not convert the specified path to an absolute path.
     :param remove_base_path:    pass a valid base path to return a relative path, even if the argument values of
                                 :paramref:`~normalize.make_absolute` or :paramref:`~normalize.resolve_sym_links` are
                                 `True`.
@@ -547,7 +543,7 @@ def normalize(path: str, make_absolute: bool = True, remove_base_path: str = "",
     :return:                    normalized path string: absolute if :paramref:`~normalize.remove_base_path` is empty and
                                 either :paramref:`~normalize.make_absolute` or :paramref:`~normalize.resolve_sym_links`
                                 is `True`; relative if :paramref:`~normalize.remove_base_path` is a base path of
-                                :paramref:`~normalize.path` or if :paramref:`~normalize.path` got passed as relative
+                                :paramref:`~normalize.path` or if :paramref:`~normalize.path` got passed as a relative
                                 path and neither :paramref:`~normalize.make_absolute` nor
                                 :paramref:`~normalize.resolve_sym_links` is `True`.
     """
@@ -563,10 +559,10 @@ def path_files(file_mask: str, file_class: Union[Type[Any], Callable] = str, **f
     """ determine existing file(s) underneath the folder specified by :paramref:`~path_files.file_mask`.
 
     :param file_mask:           glob file mask (with optional glob wildcards and :data:`PATH_PLACEHOLDERS`)
-                                specifying the files to collect (by default including the sub-folders).
+                                specifying the files to collect (by default including the subfolders).
     :param file_class:          factory used for the returned list items (see :paramref:`path_items.creator`).
                                 silly mypy does not support Union[Type[Any], Callable[[str, KwArg()], Any]].
-    :param file_kwargs:         additional/optional kwargs apart from file name passed onto the used item_class.
+    :param file_kwargs:         additional/optional kwargs apart from the file name passed onto the used item_class.
     :return:                    list of files of the class specified by :paramref:`~path_files.file_mask`.
     """
     return path_items(file_mask, selector=os_path_isfile, creator=file_class, **file_kwargs)
@@ -576,10 +572,10 @@ def path_folders(folder_mask: str, folder_class: Union[Type[Any], Callable] = st
     """ determine existing folder(s) underneath the folder specified by :paramref:`~path_folders.folder_mask`.
 
     :param folder_mask:         glob folder mask (with optional glob wildcards and :data:`PATH_PLACEHOLDERS`)
-                                specifying the folders to collect (by default including the sub-folders).
+                                specifying the folders to collect (by default including the subfolders).
     :param folder_class:        class or factory used for the returned list items (see :paramref:`path_items.creator`).
                                 silly mypy does not support Union[Type[Any], Callable[[str, KwArg()], Any]].
-    :param folder_kwargs:       additional/optional kwargs apart from file name passed onto the used item_class.
+    :param folder_kwargs:       additional/optional kwargs apart from the file name passed onto the used item_class.
     :return:                    list of folders of the class specified by :paramref:`~path_folders.folder_mask`.
     """
     return path_items(folder_mask, selector=os_path_isdir, creator=folder_class, **folder_kwargs)
@@ -593,13 +589,13 @@ def path_items(item_mask: str, selector: Callable[[str], Any] = str,
                                 specifying the files/folders to collect.
     :param selector:            called with each found file/folder name to check if it has to be added to the returned
                                 list. the default argument (str) results in returning every file/folder found by glob().
-    :param creator:             each found file/folder will be passed as argument to this class/callable and the
+    :param creator:             each found file/folder will be passed as an argument to this class/callable, and the
                                 instance/return-value will be appended as an item to the returned item list.
-                                if not passed then the `str` class will be used, which means that the items
+                                if not passed, then the `str` class will be used, which means that the items
                                 of the returned list will be strings of the file/folder path and name.
                                 passing a class, like e.g. :class:`ae.files.CachedFile`, :class:`ae.files.CachedFile`
                                 or :class:`pathlib.Path`, will create instances of this class.
-                                alternatively you can pass a callable which will be called on each found file/folder.
+                                alternatively, you can pass a callable which will be called on each found file/folder.
                                 in this case the return value of the callable will be inserted in the related
                                 item of the returned list.
                                 silly mypy does not support Union[Type[Any], Callable[[str, KwArg()], Any]].
@@ -633,7 +629,7 @@ def path_join(*parts: str) -> str:
     """
     assert parts, "missing required positional argument(s) with path parts to join"
 
-    part_index = len(parts)     # simulate os.path.join() to ignore parts on the left of part with root path
+    part_index = len(parts)     # simulate os.path.join() to ignore parts on the left of a root path part
     while part_index:
         part_index -= 1
         if parts[part_index].startswith('/'):
@@ -642,18 +638,18 @@ def path_join(*parts: str) -> str:
 
 
 _path_match_tokens_to_re = {
-    # order of ``**/`` and ``/**`` in RE tokenization pattern doesn't matter because ``**/`` will be caught first
+    # order of ``**/`` and ``/**`` in the RE tokenization pattern doesn't matter because ``**/`` will be caught first
     # no matter what, making ``/**`` the only option later on.
     # w/o leading or trailing ``/`` two consecutive asterisks will be treated as literals.
-    r'/\*\*': r'(?:/.+?)*',     # edge-case #1. catches recursive globs in the middle of path. Requires edge case #2
-                                # handled after this case.
-    r'\*\*/': r'(?:^.+?/)*',    # edge-case #2. catches recursive globs at the start of path. Requires edge case #1
-                                # handled before this case. ``^`` is used to ensure proper location for ``**/``.
+    r'/\*\*': r'(?:/.+?)*',     # edge-case #1: catches recursive globs in the middle of a path.
+                                # requires an edge case #2 handled after this case.
+    r'\*\*/': r'(?:^.+?/)*',    # edge-case #2: catches recursive globs at the start of a path. requires edge case #1
+                                # handled before this case. ``^`` is used to ensure a proper location for ``**/``.
     r'\*': r'[^/]*',            # ``[^/]*`` is used to ensure that ``*`` won't match sub-dirs, as with naive ``.*?``.
     r'\?': r'.',
     r'\[\*\]': r'\*',           # escaped special glob character.
     r'\[\?\]': r'\?',           # escaped special glob character.
-    r'\[!': r'[^',              # requires to be ordered dict, so that ``\[!`` preceded ``\[`` in RE mask. Needed mostly
+    r'\[!': r'[^',              # requires to be ordered dict, so that ``\[!`` preceded ``\[`` in the RE mask. needed
     # to differentiate between ``!`` used within character class ``[]`` and outside of it, to avoid faulty conversion.
     r'\[': r'[',
     r'\]': r']',
@@ -673,7 +669,7 @@ def path_match(path: str, mask: str) -> bool:
                                 specified by the :paramref:`~path_match.mask` argument.
     """
     if sys.version_info < (3, 13):
-        re_mask = _path_match_replacement.sub(lambda match: _path_match_tokens_to_re[match.group(0)], re.escape(mask))
+        re_mask = _path_match_replacement.sub(lambda _match: _path_match_tokens_to_re[_match.group(0)], re.escape(mask))
         match = bool(re.fullmatch(re_mask, path))
     else:
         # noinspection PyUnresolvedReferences
@@ -682,9 +678,9 @@ def path_match(path: str, mask: str) -> bool:
 
 
 def path_name(path: str) -> str:
-    """ determine placeholder key name of the specified path.
+    """ determine the placeholder key name of the specified path.
 
-    :param path:                path string to determine name of (can contain placeholders).
+    :param path:                path string to determine its placeholder key name of (can contain placeholders).
     :return:                    name (respectively dict key in :data:`PATH_PLACEHOLDERS`) of the found path
                                 or empty string if not found.
     """
@@ -712,7 +708,7 @@ def paths_match(paths: Sequence[str], masks: Sequence[str]) -> Iterable[str]:
 
 
 def placeholder_key(path: str) -> str:
-    """ determine :data:`PATH_PLACEHOLDERS` key of specified path.
+    """ determine :data:`PATH_PLACEHOLDERS` key of the specified path.
 
     :param path:                path string starting with a :data:`PATH_PLACEHOLDERS` path prefix.
     :return:                    placeholder key (if found as path prefix), else empty string.
@@ -726,9 +722,9 @@ def placeholder_key(path: str) -> str:
 
 
 def placeholder_path(path: str) -> str:
-    """ replace begin of path string with the longest prefix found in :data:`PATH_PLACEHOLDERS`.
+    """ replace the beginning of the specified path string with the longest prefix found in :data:`PATH_PLACEHOLDERS`.
 
-    :param path:                path string (optionally including sub-folders and file name).
+    :param path:                path string (optionally including subfolders and file name).
     :return:                    path string with replaced placeholder prefix (if found).
     """
     for key in sorted(PATH_PLACEHOLDERS, key=lambda k: len(PATH_PLACEHOLDERS[k]), reverse=True):
@@ -745,7 +741,7 @@ def series_file_name(file_path: str, digits: int = 2, marker: str = " ", create:
     :param digits:              number of digits used for the series index.
     :param marker:              marker that will be put at the end of the file name and before the series index.
     :param create:              pass True to create the file (to reserve the series index).
-    :return:                    file path extended with unique/new series index.
+    :return:                    the file path extended with a unique / new series index.
     """
     path_stem, ext = os_path_splitext(file_path)
     path_stem += marker
@@ -765,10 +761,10 @@ def series_file_name(file_path: str, digits: int = 2, marker: str = " ", create:
 
 
 def skip_py_cache_files(file_path: str) -> bool:
-    """ file exclude callback for the files under Python's cache folders.
+    """ file exclusion callback for the files under Python's cache folders.
 
     :param file_path:       path to file to check for exclusion, relative to the project root folder.
-    :return:                True if the file specified in :paramref:`~skip_py_cache_files.file_path` has to excluded,
+    :return:                True if the file specified in :paramref:`~skip_py_cache_files.file_path` has to be excluded,
                             else False.
     """
     return PY_CACHE_FOLDER in file_path.split('/')
@@ -784,7 +780,7 @@ def user_data_path() -> str:
     :return:    path string of the user data folder.
     """
     if os_platform == 'android':            # pragma: no cover
-        from jnius import autoclass, cast   # type: ignore  # pylint: disable=no-name-in-module, import-outside-toplevel
+        from jnius import autoclass, cast   # type: ignore # pylint: disable=no-name-in-module, import-outside-toplevel
         # noinspection PyPep8Naming
         PythonActivity = autoclass('org.kivy.android.PythonActivity')   # pylint: disable=invalid-name
         context = cast('android.content.Context', PythonActivity.mActivity)
@@ -811,7 +807,7 @@ def user_data_path() -> str:
 def user_docs_path() -> str:
     """ determine the os-specific absolute path of the {doc} directory where the user is storing the personal documents.
 
-    .. hint:: use :func:`user_data_path` instead to get a more hidden user data.
+    .. hint:: use :func:`user_data_path` instead to get the more hidden user data.
 
     :return:                    path string of the user documents folder.
     """
@@ -842,10 +838,10 @@ PATH_PLACEHOLDERS['doc'] = user_docs_path()         #: {doc} path placeholder
 PATH_PLACEHOLDERS['usr'] = user_data_path()         #: {usr} path placeholder
 
 
-class Collector:
+class Collector:                                                    # pylint: disable=too-many-instance-attributes
     """ file/folder collector class """
     def __init__(self, item_collector: Callable[[str], CollYieldItems] = coll_files, **placeholders):
-        """ create new file/folder/item collector instance with individual (extended or overriding) placeholders.
+        """ create a new file / folder / item collector instance with individual (extended or overriding) placeholders.
 
         :param item_collector:  callable to determine the item type to collect. the default is the :func:`coll_files`
                                 function. pass e.g. :func:`coll_folders` to collect only folders or :func:`coll_items`
@@ -868,7 +864,7 @@ class Collector:
         self.placeholders.update(placeholders)
 
     def check_add(self, item_mask: str, select: bool = False) -> bool:
-        """ check if item mask match file/folder(s) and if yes append accordingly to collecting instance lists.
+        """ check if the item mask matches file/folder(s) and if yes, appends accordingly to collecting instance lists.
 
         :param item_mask:       file/folder mask, optionally including wildcards in the glob.glob format.
         :param select:          pass True to additionally add found files/folders into :attr:`~Collector.selected`.
@@ -886,49 +882,39 @@ class Collector:
 
         return added_any
 
-    def _collect_appends(self, prefix: str, appends: Tuple[str, ...], only_first_of: Tuple[str, ...]):
+    def _collect_appends(self, prefix: str, appends: Tuple[str, ...]):
         for suffix in appends:
             mask = format_given(path_join(prefix, suffix), self.placeholders)
-            if self.check_add(mask) and 'append' in only_first_of:
-                return
+            self.check_add(mask)
 
-    def _collect_selects(self, prefix: str, selects: Tuple[str, ...], only_first_of: Tuple[str, ...]):
+    def _collect_selects(self, prefix: str, selects: Tuple[str, ...]):
         for suffix in selects:
             mask = format_given(path_join(prefix, suffix), self.placeholders)
             if not self.check_add(mask, select=True):
                 self.failed += 1
                 self.prefix_failed[prefix] += 1
                 self.suffix_failed[suffix] += 1
-            elif 'select' in only_first_of:
-                return
 
     def collect(self, *prefixes: str,
-                append: Union[str, Tuple[str, ...]] = (), select: Union[str, Tuple[str, ...]] = (),
-                only_first_of: Union[str, Tuple[str, ...]] = ('append', 'prefix', 'select', )) -> "Collector":
+                append: Union[str, Tuple[str, ...]] = (),
+                select: Union[str, Tuple[str, ...]] = ()) -> "Collector":
         """ collect additional files/folders by combining the given prefixes with all the given append/select suffixes.
 
-        .. note:: all arguments of this method can either be passed either as tuples, or for a single value as string.
+        .. note:: all arguments of this method can either be passed either as tuples or for a single value as string.
 
-        :param prefixes:        tuple of file/folder paths to be used as prefix.
-        :param append:          tuple of file/folder names to be used as append suffix.
-        :param select:          tuple of file/folder names to be used as select suffix. in contrary to
-                                :paramref:`~collect.append` is logging not found :paramref:`~collect.prefixes`
+        :param prefixes:        tuple of file/folder paths to be used as prefixes.
+        :param append:          tuple of file/folder names to be used as suffixes.
+        :param select:          tuple of file/folder names to be used as suffixes. this argument is, in contrary to
+                                :paramref:`~collect.append`, also logging any not found :paramref:`~collect.prefixes`
                                 combinations in the instance attributes :attr:`.failed`, :attr:`prefix_failed` and
                                 :attr:`suffix_failed`.
-        :param only_first_of:   tuple with the strings `'prefix'`, `'append'` or `'select'` or one of these strings.
-                                if it contains the string `'prefix'` then only the files/folders of the first
-                                combination will be collected. if it contains `'append'` then only the files/folders of
-                                the first combination done with the suffixes passed into the :paramref:`~collect.append`
-                                argument will be collected. if it contains `'select'` then only the files/folders of the
-                                first combination done with the suffixes passed into the :paramref:`~collect.select`
-                                argument will be collected. pass empty tuple to collect all combinations.
 
         each of the passed :paramref:`~collect.prefixes` will be combined with the suffixes specified in
-        :paramref:`~collect.append` and in :paramref:`~collect.select`. the resulting file/folder paths that are exist,
-        will then be added to the appropriate instance attribute, either :attr:`~Collector.files` for a file or
+        :paramref:`~collect.append` and in :paramref:`~collect.select`. all the matching file/folder paths
+        will be added to the appropriate instance attribute, either :attr:`~Collector.files` for a file or
         :attr:`~Collector.paths` for a folder.
 
-        additionally the existing file/folder paths from the combinations of :paramref:`~collect.prefixes` and
+        additionally, the existing file/folder paths from the combinations of :paramref:`~collect.prefixes` and
         :paramref:`~collect.select` will be added in the :attr:`~Collector.selected` list attribute.
 
         .. hint:: more details and some examples are available in the doc string of this :mod:`module <ae.paths>`.
@@ -940,17 +926,12 @@ class Collector:
             select = (select, )
         if not append and not select:
             select = ('', )
-        if isinstance(only_first_of, str):
-            only_first_of = (only_first_of, )
 
         for prefix in prefixes:
-            prefix_count = len(self.paths) + len(self.files)
             if append:
-                self._collect_appends(prefix, append, only_first_of)
+                self._collect_appends(prefix, append)
             if select:
-                self._collect_selects(prefix, select, only_first_of)
-            if 'prefix' in only_first_of and len(self.paths) + len(self.files) > prefix_count:
-                break
+                self._collect_selects(prefix, select)
 
         return self
 
@@ -968,21 +949,19 @@ class Collector:
 
 
 class FilesRegister(dict):
-    """ file register catalog - see also :ref:`files register` examples. """
+    """ file register catalog - see also :ref:`file register` examples. """
     def __init__(self, *add_path_args,
                  property_matcher: Optional[Callable[[FileObject, ], bool]] = None,
                  file_sorter: Optional[Callable[[FileObject, ], Any]] = None,
                  **add_path_kwargs):
-        """ create files register instance.
+        """ create a file register instance.
 
         this method gets redirected with :paramref:`~FilesRegister.add_path_args` and
         :paramref:`~FilesRegister.add_path_kwargs` arguments to :meth:`~FilesRegister.add_paths`.
 
-        :param add_path_args:   if passed then :meth:`~FilesRegister.add_paths` will be called with this args tuple.
-        :param property_matcher: property matcher callable, used as default value by :meth:`~FilesRegister.find_file` if
-                                not passed there.
-        :param file_sorter:     file sorter callable, used as default value by :meth:`~FilesRegister.find_file` if not
-                                passed there.
+        :param add_path_args:   if passed, then :meth:`~FilesRegister.add_paths` will be called with this args tuple.
+        :param property_matcher: used as the default by :meth:`~FilesRegister.find_file` if not specified there.
+        :param file_sorter:     used as the default value by :meth:`~FilesRegister.find_file` if not specified there.
         :param add_path_kwargs: passed onto call of :meth:`~FilesRegister.add_paths` if the
                                 :paramref:`~FilesRegister.add_path_args` got provided by the caller.
         """
@@ -997,12 +976,12 @@ class FilesRegister(dict):
         return self.find_file(*find_args, **find_kwargs)
 
     def add_file(self, file_obj: FileObject, first_index: int = APPEND_TO_END_OF_FILE_LIST):
-        """ add a single file to the list of this dict mapped by the file-name/stem as dict key.
+        """ add a single file to the list of this dict mapped by the file-name/stem as a dict key.
 
         :param file_obj:        either file path string or any object with a `stem` attribute.
         :param first_index:     pass list index -n-1..n-1 to insert :paramref:`~add_file.file_obj` in the name's list.
                                 values greater than n (==len(file_list)) will append the file_obj to the end of the file
-                                object list and values less than n-1 will insert the file_obj to the start of the file.
+                                object list, and values less than n-1 will insert the file_obj to the start of the file.
         """
         name = os_path_splitext(os_path_basename(file_obj))[0] if isinstance(file_obj, str) else file_obj.stem
         if name in self:
@@ -1023,7 +1002,7 @@ class FilesRegister(dict):
                                 values greater than n (==len(file_list)) will append the file_obj to the end of the file
                                 object list. the order of the added items will be unchanged if this value is greater or
                                 equal to zero. negative values will add the items from :paramref:`~add_files.files` in
-                                reversed order and **after** the item specified by this index value (so passing -1 will
+                                reversed order, and **after** the item specified by this index value (so passing -1 will
                                 append the items to the end in reversed order, while passing -(n+1) will insert them at
                                 the beginning in reversed order).
         :return:                list of paths of the added files.
@@ -1041,7 +1020,7 @@ class FilesRegister(dict):
         """ add files found in the folder(s) specified by the :paramref:`~add_paths.file_path_masks` args.
 
         :param file_path_masks: file path masks (with optional wildcards and :data:`~ae.paths.PATH_PLACEHOLDERS`)
-                                specifying the files to collect (by default including the sub-folders).
+                                specifying the files to collect (by default including the subfolders).
         :param first_index:     pass list index -n-1..n-1 to insert the first file_obj in each name's register list.
                                 values greater than n (==len(file_list)) will append the file_obj to the end of the file
                                 object list. the order of the added items will be unchanged if this value is greater
@@ -1050,10 +1029,10 @@ class FilesRegister(dict):
                                 the items to the end in reversed order, while passing -(n+1) will insert them at the
                                 beginning in reversed order).
         :param file_class:      the used file object class (see :data:`FileObject`). each found file object will be
-                                passed to the class constructor (callable) and added to the list which is an item of
+                                passed to the class constructor (callable) and added to the list, which is an item of
                                 this dict.
         :param init_kwargs:     additional/optional kwargs passed onto the used :paramref:`~add_paths.file_class`. pass
-                                e.g. the object_loader to use, if :paramref:`~add_paths.file_class` is
+                                e.g., the object_loader to use, if :paramref:`~add_paths.file_class` is
                                 :class:`CachedFile` (instead of the default: :class:`RegisteredFile`).
         :return:                list of paths of the added files.
         """
@@ -1066,7 +1045,7 @@ class FilesRegister(dict):
     def add_register(self, files_register: 'FilesRegister', first_index: int = APPEND_TO_END_OF_FILE_LIST) -> List[str]:
         """ add files from another :class:`FilesRegister` instance.
 
-        :param files_register:  files register instance containing the file_obj to be added.
+        :param files_register:  the :class:`FilesRegister` instance containing the file_obj to be added.
         :param first_index:     pass list index -n-1..n-1 to insert the first file_obj in each name's register list.
                                 values greater than n (==len(file_list)) will append the file_obj to the end of the file
                                 object list. the order of the added items will be unchanged if this value is greater
@@ -1120,7 +1099,7 @@ class FilesRegister(dict):
         :param file_class:      the new file object class (see :data:`~ae.files.FileObject`). each found file object
                                 will be passed to the class constructor (callable) and the return value will then
                                 replace the file object in the file list.
-        :param init_kwargs:     additional/optional kwargs passed onto the used file_class. pass e.g. the object_loader
+        :param init_kwargs:     additional/optional kwargs passed onto the used file_class. pass e.g., the object_loader
                                 to use, if :paramref:`~reclassify.file_class` is :class:`CachedFile` (the default file
                                 object class).
         """
