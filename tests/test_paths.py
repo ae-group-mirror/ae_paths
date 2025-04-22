@@ -36,6 +36,7 @@ tst_sub_files2 = tst_sub_py_files2 + [f'{tst_sub_sub_folder}/tst_sub_sub_wo_exte
 tst_sub_py_files = sorted([_ for _ in tst_sub_files1 + tst_sub_files2 if os.path.splitext(_)[1] == '.py'])
 tst_all_py_files = sorted(root_files + mod_files + tst_files + tst_sub_py_files)
 
+
 @pytest.fixture
 def test_sub_files():
     """ provide deep folder test files with properties. """
@@ -240,7 +241,7 @@ class TestPlaceholders:
         f_name = "test.tst"
         file_path = os.path.join(os.getcwd() + "_dir_name_extended", f_name)
         assert not placeholder_path(file_path).startswith("{cwd}")
-        # next assert fails because placeholder_path(file_path) == "{home}/src/ae_paths_extended/test.tst"
+        # the next assertion would fail because placeholder_path(file_path) == "{home}/src/ae_paths_extended/test.tst"
         # assert placeholder_path(file_path) == file_path
 
 
@@ -342,7 +343,7 @@ TST_OVER_FOLDER_NAME = "tst_ae_paths_over_src"
 
 @pytest.fixture
 def files_to_test():
-    """ provide test file with properties. """
+    """ provide a temporary test file with properties. """
     fn = file_root
     os.mkdir(fn)
     write_file(file_without_properties, CONTENT0)
@@ -359,21 +360,19 @@ def files_to_test():
 
 
 @pytest.fixture(params=[TST_MOVE_FOLDER_NAME, TST_OVER_FOLDER_NAME])
-def files_to_move(request, tmpdir):
-    """ create test files in source directory to be moved and/or overwritten. """
-    src_dir = tmpdir.mkdir(request.param)
+def files_to_move(request, tmp_path):
+    """ create test files in a temporary source directory to be moved and/or overwritten. """
+    src_dir = tmp_path / request.param
+    src_dir.mkdir()
 
-    src_file1 = src_dir.join(FILE0)
-    src_file1.write(CONTENT0)
-    src_sub_dir = src_dir.mkdir(DIR1)
-    src_file2 = src_sub_dir.join(FILE1)
-    src_file2.write(CONTENT1)
+    src_file1 = src_dir / FILE0
+    src_file1.write_text(CONTENT0)
+    src_sub_dir = src_dir / DIR1
+    src_sub_dir.mkdir()
+    src_file2 = src_sub_dir / FILE1
+    src_file2.write_text(CONTENT1)
 
     yield str(src_file1), str(src_file2)
-
-    # tmpdir/dst_dir1 will be removed automatically by pytest - leaving the last three temporary directories
-    # .. see https://docs.pytest.org/en/latest/tmpdir.html#the-default-base-temporary-directory
-    # shutil.rmtree(tmpdir)
 
 
 class TestCopyFiles:
@@ -1115,7 +1114,7 @@ class TestCollector:
         prefixes = ("{cwd}/../..", "{app}", "{usr}", "{usr}/{app_name}", "{cwd}/..", "{cwd}", )
         coll.collect(*prefixes, append=(".app_env" + CFG_EXT, ".sys_env" + CFG_EXT, ".sys_envTEST" + CFG_EXT,))
         assert not coll.paths
-        # global .app_env.cfg could be found on your local machine - therefore skip: assert not coll.files
+        # global .app_env.cfg could be found on your local machine - therefore, skip: assert not coll.files
         assert not coll.selected
         assert coll.failed == 0
         assert not coll.error_message
@@ -1125,18 +1124,18 @@ class TestCollector:
 
     def test_collect_appends(self):
         coll = Collector(item_collector=coll_items, app="ae", tst="tests")
-        coll.collect("{app}", "ae", "", append=("{app_name}", "paths.py", "", "ae"), only_first_of=())
+        coll.collect("{app}", "ae", "", append=("{app_name}", "paths.py", "", "ae"))
         assert coll.paths == ['ae', 'ae', '.', 'ae']
         assert coll.files == ['ae/paths.py', 'ae/paths.py']
         assert not coll.selected
         assert coll.failed == 0
         assert not coll.error_message
 
-    def test_collect_appends_only_first(self):
+    def test_collect_append_duplicates(self):
         coll = Collector(app="ae", tst="tests")
         coll.collect("{app}", "ae", "", append=("{app_name}", "paths.py", "", "ae"))
-        assert not coll.paths           # 'ae' not in coll.paths because prefix of ae/paths.py gets found before ""/ae
-        assert coll.files == ['ae/paths.py']
+        assert not coll.paths       # 'ae' not in coll.paths because the prefix of ae/paths.py gets found before ""/ae
+        assert coll.files == ['ae/paths.py', 'ae/paths.py']
         assert not coll.selected
         assert coll.failed == 0
         assert not coll.error_message
@@ -1154,7 +1153,7 @@ class TestCollector:
     def test_collect_selects(self):
         coll = Collector(item_collector=coll_items, app="ae", tst="tests")
         coll.collect("{cwd}", "{app}", "ae",
-                     select=(".*", "README.md", "tests/test_paths.py", "", "ae", ), only_first_of=())
+                     select=(".*", "README.md", "tests/test_paths.py", "", "ae", ))
 
         assert len(coll.paths) >= 4   # ['{cwd}', '{cwd}/ae', 'ae', 'ae'] + localMachFolders .git/.pylint/.mypy_cache/..
         assert sum(1 for _ in coll.paths if _ == os.getcwd()) == 1
@@ -1175,10 +1174,9 @@ class TestCollector:
         assert 0 < coll.failed < len(coll.paths) + len(coll.files)
         assert coll.error_message
 
-    def test_collect_select_only_first(self):
+    def test_collect_select_failures(self):
         coll = Collector(app="ae", tst="tests")
-        coll.collect("{cwd}", "{app}", "ae",
-                     select=".*")
+        coll.collect("{cwd}", "{app}", "ae", select=".*")
         assert not coll.paths
         assert 2 <= len(coll.files) <= 4
         # ['{cwd}/.gitignore', '{cwd}/.commit_msg.txt', '{cwd}/.python-version', '{cwd}/.gitlab-ci.yml']
@@ -1187,13 +1185,15 @@ class TestCollector:
         assert '.gitignore' in files
         assert '.gitlab-ci.yml' in files
         assert coll.selected == coll.files
-        assert coll.failed == 0
-        assert not coll.error_message
+        assert coll.failed == 2
+        assert coll.prefix_failed == {'{app}': 1, 'ae': 1}
+        assert coll.suffix_failed == {'.*': 2}
+        assert coll.error_message
 
     def test_collect_select_string(self):
         coll = Collector(app="ae", tst="tests")
         coll.collect("{cwd}", "{app}", "ae",
-                     select=".*", only_first_of=())
+                     select=".*")
         assert not coll.paths
         assert 2 <= len(coll.files) <= 4
         # ['{cwd}/.gitignore', '{cwd}/.gitlab-ci.yml'] only .commit_msg.txt|.python-version not existing on CI host
@@ -1207,7 +1207,7 @@ class TestCollector:
 
     def test_collect_prefixes_only(self):
         coll = Collector(item_collector=coll_items, app="ae", tst="tests")
-        coll.collect("{app}", "{usr}", 'tests/test_paths.py', only_first_of=())
+        coll.collect("{app}", "{usr}", 'tests/test_paths.py')
         assert 1 <= len(coll.paths) <= 2   # ['ae', '/home/andi/.config']
         assert 'ae' in coll.paths
         assert coll.files == ['tests/test_paths.py']
@@ -1215,12 +1215,12 @@ class TestCollector:
         assert coll.failed == 0
         assert not coll.error_message
 
-    def test_collect_prefixes_only_first_as_string(self):
-        coll = Collector(item_collector=coll_folders, app="ae", tst="tests")
-        coll.collect("{app}", "{usr}", "tests/test_paths.py", only_first_of="prefix")
-        assert coll.paths == ['ae']
+    def test_collect_prefixes_as_relative_and_duplicate_absolute_folder_paths(self):
+        coll = Collector(item_collector=coll_folders, app="ae", usr="ae")
+        coll.collect('{app}', '{cwd}', '{usr}')
+        assert coll.paths == ['ae', '/home/andi/src/ae_paths', 'ae']
         assert not coll.files
-        assert coll.selected == ['ae']
+        assert coll.selected == ['ae', '/home/andi/src/ae_paths', 'ae']
         assert coll.failed == 0
         assert not coll.error_message
 
@@ -1239,7 +1239,7 @@ class TestCollector:
 
         coll = Collector()
         coll.collect('*', append='*.py')
-        assert sorted(coll.files)  == sorted(mod_files + tst_files)
+        assert sorted(coll.files) == sorted(mod_files + tst_files)
 
         coll = Collector()
         coll.collect('*/*', append='*.py')
