@@ -266,7 +266,7 @@ from ae.base import (                                                           
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile                 # type: ignore
 
 
-__version__ = '0.3.39'
+__version__ = '0.3.40'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
