@@ -151,9 +151,10 @@ class TestPlaceholders:
     def test_add_common_storage_paths(self):
         paths_count = len(PATH_PLACEHOLDERS)
         add_common_storage_paths()
-        assert len(PATH_PLACEHOLDERS) > paths_count
-        assert 'application' in PATH_PLACEHOLDERS
-        if 'CI_PROJECT_ID' not in os.environ:               # skip on gitlab CI
+        assert len(PATH_PLACEHOLDERS) >= paths_count                # 6 == 6
+        if 'CI_PROJECT_ID' not in os.environ:                       # skip on GitLab CI
+            assert len(PATH_PLACEHOLDERS) > paths_count
+            assert 'application' in PATH_PLACEHOLDERS
             assert 'documents' in PATH_PLACEHOLDERS
             assert 'downloads' in PATH_PLACEHOLDERS
             assert 'external_storage' in PATH_PLACEHOLDERS
@@ -163,7 +164,7 @@ class TestPlaceholders:
             assert 'root' in PATH_PLACEHOLDERS
             assert 'videos' in PATH_PLACEHOLDERS
         if os_platform == 'android':
-            assert 'sdcard' in PATH_PLACEHOLDERS            # pragma: no cover
+            assert 'sdcard' in PATH_PLACEHOLDERS                    # pragma: no cover
 
     def test_normalize(self):
         f_path = "norm_file.tst"
@@ -1208,7 +1209,7 @@ class TestCollector:
     def test_collect_prefixes_only(self):
         coll = Collector(item_collector=coll_items, app="ae", tst="tests")
         coll.collect("{app}", "{usr}", 'tests/test_paths.py')
-        assert 1 <= len(coll.paths) <= 2   # ['ae', '/home/andi/.config']
+        assert 1 <= len(coll.paths) <= 2   # ['ae', '/home/andi/.config'], CI: [..., '/builds/ae-group/ae_paths...']
         assert 'ae' in coll.paths
         assert coll.files == ['tests/test_paths.py']
         assert coll.selected == coll.paths + coll.files
@@ -1218,9 +1219,10 @@ class TestCollector:
     def test_collect_prefixes_as_relative_and_duplicate_absolute_folder_paths(self):
         coll = Collector(item_collector=coll_folders, app="ae", usr="ae")
         coll.collect('{app}', '{cwd}', '{usr}')
-        assert coll.paths == ['ae', '/home/andi/src/ae_paths', 'ae']
+        # assert coll.paths == ['ae', '/home/andi/src/ae_paths', 'ae'] != CI: ['ae', '/builds/ae-group/ae_paths', 'ae']
+        assert coll.paths == ['ae', normalize('{cwd}'), 'ae']
         assert not coll.files
-        assert coll.selected == ['ae', '/home/andi/src/ae_paths', 'ae']
+        assert coll.selected == ['ae', normalize('{cwd}'), 'ae']
         assert coll.failed == 0
         assert not coll.error_message
 
