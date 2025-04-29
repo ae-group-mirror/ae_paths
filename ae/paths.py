@@ -77,7 +77,7 @@ local file systems as well as on remote servers/hosts. one implementation exampl
 
 the class :ref:`FilesRegister <file register>` helps you to create and cache file path
 registers permanently, to quickly find at any time the best fitting match for a requested purpose.
-for example, the :mod:`~ae.gui_app` module is using it to dynamically select
+for example, the :mod:`~ae.gui` portion is using it to dynamically select
 image/font/audio/... resource files depending on the current user preferences, hardware
 and/or software environment.
 
@@ -186,7 +186,7 @@ file register
 ^^^^^^^^^^^^^
 
 a file register is an instance of the :class:`FilesRegister`, providing a property-based file collection and selection,
-which is e.g., used by the :mod:`ae.gui_app` ae namespace portion to find and select resource files like icon/image or
+which is e.g., used by the :mod:`ae.gui` ae namespace portion to find and select resource files like icon/image or
 sound files.
 
 files can be collected from various places by a single instance of the class :class:`FilesRegister`::
@@ -266,7 +266,7 @@ from ae.base import (                                                           
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile                 # type: ignore
 
 
-__version__ = '0.3.40'
+__version__ = '0.3.41'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
@@ -329,7 +329,7 @@ def coll_items(item_mask: str,
                                 instance/return-value will be appended as an item to the returned item list.
                                 if not passed, then the `str` class will be used, which means that the items
                                 of the returned list will be strings of the file/folder path and name.
-                                passing a class, like e.g. :class:`ae.files.CachedFile`, :class:`ae.files.CachedFile`
+                                passing a class, like e.g., :class:`ae.files.CachedFile`, :class:`ae.files.CachedFile`
                                 or :class:`pathlib.Path`, will create instances of this class.
                                 alternatively, you can pass a callable which will be called on each found file/folder.
                                 in this case the return value of the callable will be inserted in the related
@@ -593,7 +593,7 @@ def path_items(item_mask: str, selector: Callable[[str], Any] = str,
                                 instance/return-value will be appended as an item to the returned item list.
                                 if not passed, then the `str` class will be used, which means that the items
                                 of the returned list will be strings of the file/folder path and name.
-                                passing a class, like e.g. :class:`ae.files.CachedFile`, :class:`ae.files.CachedFile`
+                                passing a class, like e.g., :class:`ae.files.CachedFile`, :class:`ae.files.CachedFile`
                                 or :class:`pathlib.Path`, will create instances of this class.
                                 alternatively, you can pass a callable which will be called on each found file/folder.
                                 in this case the return value of the callable will be inserted in the related
