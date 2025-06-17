@@ -1,6 +1,6 @@
 # dependencies of the paths portion
 # pyjnius/jnius only needed on android (where it gets automatically added by kivy/buildozer)
-# plyer only needed for add_common_storage_paths() testing.
+# plyer is optional but recommended for full add_common_storage_paths() testing.
 # ctypes.windll only needed for add_common_storage_paths() under MS Windows.
 ae_base
 ae_files

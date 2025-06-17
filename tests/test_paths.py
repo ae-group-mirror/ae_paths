@@ -16,6 +16,12 @@ from ae.paths import (PATH_PLACEHOLDERS,
                       user_data_path, user_docs_path,
                       Collector, FilesRegister)
 
+try:
+    import plyer
+    plyer_is_importable = True
+except (ModuleNotFoundError, ImportError):                          # pragma: no cover
+    plyer_is_importable = False
+
 
 file_root = 'TstRootFolder'
 file_name = 'tst_file'
@@ -154,15 +160,16 @@ class TestPlaceholders:
         assert len(PATH_PLACEHOLDERS) >= paths_count                # 6 == 6
         if 'CI_PROJECT_ID' not in os.environ:                       # skip on GitLab CI
             assert len(PATH_PLACEHOLDERS) > paths_count
-            assert 'application' in PATH_PLACEHOLDERS
-            assert 'documents' in PATH_PLACEHOLDERS
-            assert 'downloads' in PATH_PLACEHOLDERS
-            assert 'external_storage' in PATH_PLACEHOLDERS
-            assert 'home' in PATH_PLACEHOLDERS
-            assert 'music' in PATH_PLACEHOLDERS
-            assert 'pictures' in PATH_PLACEHOLDERS
-            assert 'root' in PATH_PLACEHOLDERS
-            assert 'videos' in PATH_PLACEHOLDERS
+            if plyer_is_importable:
+                assert 'application' in PATH_PLACEHOLDERS
+                assert 'documents' in PATH_PLACEHOLDERS
+                assert 'downloads' in PATH_PLACEHOLDERS
+                assert 'external_storage' in PATH_PLACEHOLDERS
+                assert 'home' in PATH_PLACEHOLDERS
+                assert 'music' in PATH_PLACEHOLDERS
+                assert 'pictures' in PATH_PLACEHOLDERS
+                assert 'root' in PATH_PLACEHOLDERS
+                assert 'videos' in PATH_PLACEHOLDERS
         if os_platform == 'android':
             assert 'sdcard' in PATH_PLACEHOLDERS                    # pragma: no cover
 

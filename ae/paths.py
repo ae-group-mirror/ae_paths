@@ -257,7 +257,7 @@ import sys
 from collections import defaultdict
 from functools import partial
 from pathlib import PurePath
-from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple, Type, Union
+from typing import Any, Callable, Iterable, Optional, Type, Union
 
 from ae.base import (                                                                       # type: ignore
     PY_CACHE_FOLDER, app_name_guess, env_str, format_given, norm_path,
@@ -266,7 +266,7 @@ from ae.base import (                                                           
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile                 # type: ignore
 
 
-__version__ = '0.3.41'
+__version__ = '0.3.42'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
@@ -336,9 +336,10 @@ def coll_items(item_mask: str,
                                 item of the returned list.
                                 silly mypy does not support ``Union[Type[Any], Callable[[str, KwArg()], Any]]``.
     :param creator_kwargs:      additional/optional kwargs passed onto the used item_class apart from the item name.
-    :return:                    iterator/generator yielding found and selected file system items as instances
-                                of the item creator class (passed as :paramref:`~coll_items.creator` argument,
-                                defaulting to the `str` class).
+    :return:                    iterator/generator yielding a 2-item-tuple for each found/matching file system item.
+                                the first tuple-item is the file/folder type returned by the specified
+                                :paramref:`~coll_item.type_detector` argument, and the second tuple-item is an instance
+                                of the item creator class (specified by the :paramref:`~coll_items.creator` argument).
     """
     item_mask = normalize(item_mask, make_absolute=False, remove_dots=False, resolve_sym_links=False)   # substitute '~'
 
@@ -357,7 +358,9 @@ def coll_files(file_mask: str, file_class: Union[Type[Any], Callable] = str, **f
     :param file_class:          factory used for the returned list items (see :paramref:`coll_items.creator`).
                                 silly mypy does not support Union[Type[Any], Callable[[str, KwArg()], Any]].
     :param file_kwargs:         additional/optional kwargs apart from the file name passed onto the used item_class.
-    :return:                    list of files of the class specified by :paramref:`~coll_files.file_mask`.
+    :return:                    iterator/generator yielding a 2-item-tuple for each found/matching file.
+                                the first tuple-item is the file extension, and the second tuple-item is an instance
+                                of the specified :paramref:`~coll_files.file_class`.
     """
     yield from coll_items(file_mask, selector=os_path_isfile, creator=file_class, **file_kwargs)
 
@@ -370,7 +373,11 @@ def coll_folders(folder_mask: str, folder_class: Union[Type[Any], Callable] = st
     :param folder_class:        class or factory used for the returned list items (see :paramref:`coll_items.creator`).
                                 silly mypy does not support Union[Type[Any], Callable[[str, KwArg()], Any]].
     :param folder_kwargs:       additional/optional kwargs apart from the file name passed onto the used item_class.
-    :return:                    list of folders of the class specified by :paramref:`~coll_folders.folder_mask`.
+    :return:                    iterator/generator yielding a 2-item-tuple for each found/matching folder/directory.
+                                the first tuple-item is :data:`COLLECTED_FOLDER` (as long as
+                                :paramref:`~coll_folders.folder_kwargs` does not overwrite the
+                                :paramref:`coll_items.type_detector` argument), and the second tuple-item is an instance
+                                of the specified :paramref:`~coll_folders.folder_class`.
     """
     yield from coll_items(folder_mask, selector=os_path_isdir, creator=folder_class, **folder_kwargs)
 
@@ -410,7 +417,7 @@ def add_common_storage_paths():
                         PATH_PLACEHOLDERS[attr[4:-4]] = path
                 except (AttributeError, NotImplementedError, Exception):        # pylint: disable=broad-exception-caught
                     pass
-    except (ModuleNotFoundError, ImportError):                                  # pragma: no cover
+    except (ModuleNotFoundError, ImportError):                      # pragma: no cover
         pass
 
     if os_platform == 'linux':
@@ -420,15 +427,15 @@ def add_common_storage_paths():
                 for directory in next(os.walk(place))[1]:
                     PATH_PLACEHOLDERS[directory] = os_path_join(place, directory)
 
-    elif os_platform in ('darwin', 'ios'):                                      # pragma: no cover
+    elif os_platform in ('darwin', 'ios'):                          # pragma: no cover
         vol = '/Volume'
         if os_path_isdir(vol):
             for drive in next(os.walk(vol))[1]:
                 PATH_PLACEHOLDERS[drive] = os_path_join(vol, drive)
 
-    elif os_platform in ('win32', 'cygwin'):                              # pragma: no cover
+    elif os_platform in ('win32', 'cygwin'):                        # pragma: no cover
         try:
-            from ctypes import windll, create_unicode_buffer              # pylint: disable=import-outside-toplevel
+            from ctypes import windll, create_unicode_buffer        # pylint: disable=import-outside-toplevel
 
             bitmask = windll.kernel32.GetLogicalDrives()
             get_volume_information = windll.kernel32.GetVolumeInformationW
@@ -440,7 +447,7 @@ def add_common_storage_paths():
                     get_volume_information(drive, name, buf_len, None, None, None, None, 0)
                     PATH_PLACEHOLDERS[name.value] = drive
                 bitmask >>= 1
-        except (ModuleNotFoundError, ImportError):
+        except (ModuleNotFoundError, ImportError):                  # pragma: no cover
             pass
 
 
@@ -481,7 +488,7 @@ move_tree = shutil.move
 """ another alias for :func:`shutil.move` (see also :func:`~ae.paths.move_file`). """
 
 
-def copy_files(src_folder: str, dst_folder: str, overwrite: bool = False, copier: Callable = copy_file) -> List[str]:
+def copy_files(src_folder: str, dst_folder: str, overwrite: bool = False, copier: Callable = copy_file) -> list[str]:
     """ copy files from src_folder into an optionally created dst_folder, optionally overwriting destination files.
 
     :param src_folder:          path to the source folder / directory where the files get copied from. only the
@@ -512,7 +519,7 @@ def copy_files(src_folder: str, dst_folder: str, overwrite: bool = False, copier
     return updated
 
 
-def move_files(src_folder: str, dst_folder: str, overwrite: bool = False) -> List[str]:
+def move_files(src_folder: str, dst_folder: str, overwrite: bool = False) -> list[str]:
     """ move files from src_folder into an optionally created dst_folder, optionally overwriting destination files.
 
     :param src_folder:          path to the source folder / directory where the files get moved from. placeholders in
@@ -555,7 +562,7 @@ def normalize(path: str, make_absolute: bool = True, remove_base_path: str = "",
                      )
 
 
-def path_files(file_mask: str, file_class: Union[Type[Any], Callable] = str, **file_kwargs) -> List[Any]:
+def path_files(file_mask: str, file_class: Union[Type[Any], Callable] = str, **file_kwargs) -> list[Any]:
     """ determine existing file(s) underneath the folder specified by :paramref:`~path_files.file_mask`.
 
     :param file_mask:           glob file mask (with optional glob wildcards and :data:`PATH_PLACEHOLDERS`)
@@ -568,7 +575,7 @@ def path_files(file_mask: str, file_class: Union[Type[Any], Callable] = str, **f
     return path_items(file_mask, selector=os_path_isfile, creator=file_class, **file_kwargs)
 
 
-def path_folders(folder_mask: str, folder_class: Union[Type[Any], Callable] = str, **folder_kwargs) -> List[Any]:
+def path_folders(folder_mask: str, folder_class: Union[Type[Any], Callable] = str, **folder_kwargs) -> list[Any]:
     """ determine existing folder(s) underneath the folder specified by :paramref:`~path_folders.folder_mask`.
 
     :param folder_mask:         glob folder mask (with optional glob wildcards and :data:`PATH_PLACEHOLDERS`)
@@ -582,7 +589,7 @@ def path_folders(folder_mask: str, folder_class: Union[Type[Any], Callable] = st
 
 
 def path_items(item_mask: str, selector: Callable[[str], Any] = str,
-               creator: Union[Type[Any], Callable] = str, **creator_kwargs) -> List[Any]:
+               creator: Union[Type[Any], Callable] = str, **creator_kwargs) -> list[Any]:
     """ determine existing file/folder item(s) underneath the folder specified by :paramref:`~path_items.item_mask`.
 
     :param item_mask:           file path mask (with optional glob wildcards and :data:`PATH_PLACEHOLDERS`)
@@ -691,14 +698,14 @@ def path_name(path: str) -> str:
     return ""
 
 
-def paths_match(paths: Sequence[str], masks: Sequence[str]) -> Iterable[str]:
+def paths_match(paths: Iterable[str], masks: Iterable[str]) -> Iterable[str]:
     """ filter the paths matching at least one of the specified glob-like wildcard masks.
 
-    :param paths:               sequence of path strings to be checked if they match at least one pattern/mask,
+    :param paths:               iterable of path strings to be checked if they match at least one pattern/mask,
                                 specified by the :paramref:`~paths_match.masks` argument.
-    :param masks:               sequence of path masks/pattern with glob-like wildcards.
-    :return:                    list of the paths specified by :paramref:`~paths_match.paths` that match at least one
-                                mask, specified by the :paramref:`~paths_match.masks` argument.
+    :param masks:               iterable of path masks/pattern with glob-like wildcards.
+    :return:                    iterator, yielding the paths specified by :paramref:`~paths_match.paths` that are
+                                matching at least one mask, specified by the :paramref:`~paths_match.masks` argument.
     """
     for path in paths:
         for mask in masks:
@@ -853,12 +860,12 @@ class Collector:                                                    # pylint: di
         """
         self._item_collector = item_collector
 
-        self.paths: List[CollCreatorReturnType] = []            #: list of found/collected folders
-        self.files: List[CollCreatorReturnType] = []            #: list of found/collected files
-        self.selected: List[CollCreatorReturnType] = []         #: list of found/collected files/folders item instances
+        self.paths: list[CollCreatorReturnType] = []            #: list of found/collected folders
+        self.files: list[CollCreatorReturnType] = []            #: list of found/collected files
+        self.selected: list[CollCreatorReturnType] = []         #: list of found/collected files/folders item instances
         self.failed = 0                                         #: number of not found select-combinations
-        self.prefix_failed: Dict[str, int] = defaultdict(int)   #: not found select-combinations count for each prefix
-        self.suffix_failed: Dict[str, int] = defaultdict(int)   #: not found select-combinations count for each suffix
+        self.prefix_failed: dict[str, int] = defaultdict(int)   #: not found select-combinations count for each prefix
+        self.suffix_failed: dict[str, int] = defaultdict(int)   #: not found select-combinations count for each suffix
 
         self.placeholders = PATH_PLACEHOLDERS.copy()            #: path part placeholders of this Collector instance
         self.placeholders.update(placeholders)
@@ -882,12 +889,12 @@ class Collector:                                                    # pylint: di
 
         return added_any
 
-    def _collect_appends(self, prefix: str, appends: Tuple[str, ...]):
+    def _collect_appends(self, prefix: str, appends: tuple[str, ...]):
         for suffix in appends:
             mask = format_given(path_join(prefix, suffix), self.placeholders)
             self.check_add(mask)
 
-    def _collect_selects(self, prefix: str, selects: Tuple[str, ...]):
+    def _collect_selects(self, prefix: str, selects: tuple[str, ...]):
         for suffix in selects:
             mask = format_given(path_join(prefix, suffix), self.placeholders)
             if not self.check_add(mask, select=True):
@@ -896,8 +903,8 @@ class Collector:                                                    # pylint: di
                 self.suffix_failed[suffix] += 1
 
     def collect(self, *prefixes: str,
-                append: Union[str, Tuple[str, ...]] = (),
-                select: Union[str, Tuple[str, ...]] = ()) -> "Collector":
+                append: Union[str, tuple[str, ...]] = (),
+                select: Union[str, tuple[str, ...]] = ()) -> "Collector":
         """ collect additional files/folders by combining the given prefixes with all the given append/select suffixes.
 
         .. note:: all arguments of this method can either be passed either as tuples or for a single value as string.
@@ -994,7 +1001,7 @@ class FilesRegister(dict):
         else:
             self[name] = [file_obj]
 
-    def add_files(self, files: Iterable[FileObject], first_index: int = APPEND_TO_END_OF_FILE_LIST) -> List[str]:
+    def add_files(self, files: Iterable[FileObject], first_index: int = APPEND_TO_END_OF_FILE_LIST) -> list[str]:
         """ add files from another :class:`FilesRegister` instance.
 
         :param files:           iterable with file objects to be added.
@@ -1016,7 +1023,7 @@ class FilesRegister(dict):
         return added_file_paths
 
     def add_paths(self, *file_path_masks: str, first_index: int = APPEND_TO_END_OF_FILE_LIST,
-                  file_class: Type[FileObject] = RegisteredFile, **init_kwargs) -> List[str]:
+                  file_class: Type[FileObject] = RegisteredFile, **init_kwargs) -> list[str]:
         """ add files found in the folder(s) specified by the :paramref:`~add_paths.file_path_masks` args.
 
         :param file_path_masks: file path masks (with optional wildcards and :data:`~ae.paths.PATH_PLACEHOLDERS`)
@@ -1042,7 +1049,7 @@ class FilesRegister(dict):
                 self.add_files(path_files(mask, file_class=file_class, **init_kwargs), first_index=first_index))
         return added_file_paths
 
-    def add_register(self, files_register: 'FilesRegister', first_index: int = APPEND_TO_END_OF_FILE_LIST) -> List[str]:
+    def add_register(self, files_register: 'FilesRegister', first_index: int = APPEND_TO_END_OF_FILE_LIST) -> list[str]:
         """ add files from another :class:`FilesRegister` instance.
 
         :param files_register:  the :class:`FilesRegister` instance containing the file_obj to be added.
