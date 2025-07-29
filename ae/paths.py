@@ -73,7 +73,7 @@ and :class:`FilesRegister`, described in the section :ref:`file register`.
 
 use the :ref:`Collector class <collecting files>` for temporary quick file path searches on your
 local file systems as well as on remote servers/hosts. one implementation example is e.g., the method
-:meth:`~aedev.pythonanywhere.PythonanywhereApi.deployed_code_files` of the :mod:`aedev.pythonanywhere` module.
+:meth:`~ae.pythonanywhere.PythonanywhereApi.deployed_code_files` of the :mod:`ae.pythonanywhere` module.
 
 the class :ref:`FilesRegister <file register>` helps you to create and cache file path
 registers permanently, to quickly find at any time the best fitting match for a requested purpose.
@@ -266,7 +266,7 @@ from ae.base import (                                                           
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile                 # type: ignore
 
 
-__version__ = '0.3.42'
+__version__ = '0.3.43'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
@@ -295,91 +295,6 @@ SearcherRetType = Iterable[CollArgType]
 
 SearcherType = Callable[[str], SearcherRetType]
 """ type of the callable :paramref:`~coll_items.searcher` argument of :func:`coll_items` """
-
-
-def coll_item_type(item_path: str) -> CollYieldType:
-    """ classify path item to be either file, folder or non-existent/excluded/skipped.
-
-    :param item_path:           file/folder path string.
-    :return:                    COLLECTED_FOLDER for folders, the file extension for files or None if not found.
-    """
-    return COLLECTED_FOLDER if os_path_isdir(item_path) else os_path_splitext(item_path)[1]
-
-
-def coll_items(item_mask: str,
-               searcher: SearcherType = partial(glob.glob, recursive=True),
-               selector: Callable[[CollArgType], Union[bool, Any]] = str,
-               type_detector: Callable[[CollArgType], CollYieldType] = coll_item_type,
-               creator: Callable[[CollArgType], CollCreatorReturnType] = str,  # mypy lacks **creator_kwargs in Callable
-               **creator_kwargs
-               ) -> CollYieldItems:
-    """ determine path-/file-like item(s) specified with optional wildcards by :paramref:`~coll_items.item_mask`.
-
-    :param item_mask:           file path mask with optional :func:`~glob.glob` wildcards, the '~' shortcut for the
-                                home folder path and any :data:`path placeholders <PATH_PLACEHOLDERS>`, which is
-                                specifying the files/folders to collect. use the '**' glob wildcard in a path to include
-                                also items from subfolders deeper than one level.
-    :param searcher:            callable to convert|resolve a path with optional wildcards, specified in
-                                :paramref:`~coll_items.item_mask`, into multiple item file/folder path strings.
-    :param type_detector:       callable to typify/classify a found item to be stored in the first tuple items
-                                of the returned list. if not passed, then :func:`coll_item_type` will be used.
-    :param selector:            called with each found file/folder name to check if it has to be added to the returned
-                                list. the default argument (str) results in returning every file/folder found by glob().
-    :param creator:             each found file/folder will be passed as an argument to this class/callable, and the
-                                instance/return-value will be appended as an item to the returned item list.
-                                if not passed, then the `str` class will be used, which means that the items
-                                of the returned list will be strings of the file/folder path and name.
-                                passing a class, like e.g., :class:`ae.files.CachedFile`, :class:`ae.files.CachedFile`
-                                or :class:`pathlib.Path`, will create instances of this class.
-                                alternatively, you can pass a callable which will be called on each found file/folder.
-                                in this case the return value of the callable will be inserted in the related
-                                item of the returned list.
-                                silly mypy does not support ``Union[Type[Any], Callable[[str, KwArg()], Any]]``.
-    :param creator_kwargs:      additional/optional kwargs passed onto the used item_class apart from the item name.
-    :return:                    iterator/generator yielding a 2-item-tuple for each found/matching file system item.
-                                the first tuple-item is the file/folder type returned by the specified
-                                :paramref:`~coll_item.type_detector` argument, and the second tuple-item is an instance
-                                of the item creator class (specified by the :paramref:`~coll_items.creator` argument).
-    """
-    item_mask = normalize(item_mask, make_absolute=False, remove_dots=False, resolve_sym_links=False)   # substitute '~'
-
-    for coll_arg in searcher(item_mask):
-        if selector(coll_arg):
-            # noinspection PyArgumentList
-            instance = creator(coll_arg, **creator_kwargs)
-            yield type_detector(coll_arg), instance
-
-
-def coll_files(file_mask: str, file_class: Union[Type[Any], Callable] = str, **file_kwargs) -> CollYieldItems:
-    """ determine existing file(s) underneath the folder specified by :paramref:`~coll_files.file_mask`.
-
-    :param file_mask:           glob file mask (with optional glob wildcards and :data:`PATH_PLACEHOLDERS`)
-                                specifying the files to collect (by default including the subfolders).
-    :param file_class:          factory used for the returned list items (see :paramref:`coll_items.creator`).
-                                silly mypy does not support Union[Type[Any], Callable[[str, KwArg()], Any]].
-    :param file_kwargs:         additional/optional kwargs apart from the file name passed onto the used item_class.
-    :return:                    iterator/generator yielding a 2-item-tuple for each found/matching file.
-                                the first tuple-item is the file extension, and the second tuple-item is an instance
-                                of the specified :paramref:`~coll_files.file_class`.
-    """
-    yield from coll_items(file_mask, selector=os_path_isfile, creator=file_class, **file_kwargs)
-
-
-def coll_folders(folder_mask: str, folder_class: Union[Type[Any], Callable] = str, **folder_kwargs) -> CollYieldItems:
-    """ determine existing folder(s) underneath the folder specified by :paramref:`~coll_folders.folder_mask`.
-
-    :param folder_mask:         glob folder mask (with optional glob wildcards and :data:`PATH_PLACEHOLDERS`)
-                                specifying the folders to collect (by default including the subfolders).
-    :param folder_class:        class or factory used for the returned list items (see :paramref:`coll_items.creator`).
-                                silly mypy does not support Union[Type[Any], Callable[[str, KwArg()], Any]].
-    :param folder_kwargs:       additional/optional kwargs apart from the file name passed onto the used item_class.
-    :return:                    iterator/generator yielding a 2-item-tuple for each found/matching folder/directory.
-                                the first tuple-item is :data:`COLLECTED_FOLDER` (as long as
-                                :paramref:`~coll_folders.folder_kwargs` does not overwrite the
-                                :paramref:`coll_items.type_detector` argument), and the second tuple-item is an instance
-                                of the specified :paramref:`~coll_folders.folder_class`.
-    """
-    yield from coll_items(folder_mask, selector=os_path_isdir, creator=folder_class, **folder_kwargs)
 
 
 def add_common_storage_paths():
@@ -469,6 +384,91 @@ def app_docs_path() -> str:
     :return:                    path string of the user documents app folder.
     """
     return os_path_join(user_docs_path(), PATH_PLACEHOLDERS.get('main_app_name', PATH_PLACEHOLDERS['app_name']))
+
+
+def coll_files(file_mask: str, file_class: Union[Type[Any], Callable] = str, **file_kwargs) -> CollYieldItems:
+    """ determine existing file(s) underneath the folder specified by :paramref:`~coll_files.file_mask`.
+
+    :param file_mask:           glob file mask (with optional glob wildcards and :data:`PATH_PLACEHOLDERS`)
+                                specifying the files to collect (by default including the subfolders).
+    :param file_class:          factory used for the returned list items (see :paramref:`coll_items.creator`).
+                                silly mypy does not support Union[Type[Any], Callable[[str, KwArg()], Any]].
+    :param file_kwargs:         additional/optional kwargs apart from the file name passed onto the used item_class.
+    :return:                    iterator/generator yielding a 2-item-tuple for each found/matching file.
+                                the first tuple-item is the file extension, and the second tuple-item is an instance
+                                of the specified :paramref:`~coll_files.file_class`.
+    """
+    yield from coll_items(file_mask, selector=os_path_isfile, creator=file_class, **file_kwargs)
+
+
+def coll_folders(folder_mask: str, folder_class: Union[Type[Any], Callable] = str, **folder_kwargs) -> CollYieldItems:
+    """ determine existing folder(s) underneath the folder specified by :paramref:`~coll_folders.folder_mask`.
+
+    :param folder_mask:         glob folder mask (with optional glob wildcards and :data:`PATH_PLACEHOLDERS`)
+                                specifying the folders to collect (by default including the subfolders).
+    :param folder_class:        class or factory used for the returned list items (see :paramref:`coll_items.creator`).
+                                silly mypy does not support Union[Type[Any], Callable[[str, KwArg()], Any]].
+    :param folder_kwargs:       additional/optional kwargs apart from the file name passed onto the used item_class.
+    :return:                    iterator/generator yielding a 2-item-tuple for each found/matching folder/directory.
+                                the first tuple-item is :data:`COLLECTED_FOLDER` (as long as
+                                :paramref:`~coll_folders.folder_kwargs` does not overwrite the
+                                :paramref:`coll_items.type_detector` argument), and the second tuple-item is an instance
+                                of the specified :paramref:`~coll_folders.folder_class`.
+    """
+    yield from coll_items(folder_mask, selector=os_path_isdir, creator=folder_class, **folder_kwargs)
+
+
+def coll_item_type(item_path: str) -> CollYieldType:
+    """ classify path item to be either file, folder or non-existent/excluded/skipped.
+
+    :param item_path:           file/folder path string.
+    :return:                    COLLECTED_FOLDER for folders, the file extension for files or None if not found.
+    """
+    return COLLECTED_FOLDER if os_path_isdir(item_path) else os_path_splitext(item_path)[1]
+
+
+def coll_items(item_mask: str,
+               searcher: SearcherType = partial(glob.glob, recursive=True),
+               selector: Callable[[CollArgType], Union[bool, Any]] = str,
+               type_detector: Callable[[CollArgType], CollYieldType] = coll_item_type,
+               creator: Callable[[CollArgType], CollCreatorReturnType] = str,  # mypy lacks **creator_kwargs in Callable
+               **creator_kwargs
+               ) -> CollYieldItems:
+    """ determine path-/file-like item(s) specified with optional wildcards by :paramref:`~coll_items.item_mask`.
+
+    :param item_mask:           file path mask with optional :func:`~glob.glob` wildcards, the '~' shortcut for the
+                                home folder path and any :data:`path placeholders <PATH_PLACEHOLDERS>`, which is
+                                specifying the files/folders to collect. use the '**' glob wildcard in a path to include
+                                also items from subfolders deeper than one level.
+    :param searcher:            callable to convert|resolve a path with optional wildcards, specified in
+                                :paramref:`~coll_items.item_mask`, into multiple item file/folder path strings.
+    :param type_detector:       callable to typify/classify a found item to be stored in the first tuple items
+                                of the returned list. if not passed, then :func:`coll_item_type` will be used.
+    :param selector:            called with each found file/folder name to check if it has to be added to the returned
+                                list. the default argument (str) results in returning every file/folder found by glob().
+    :param creator:             each found file/folder will be passed as an argument to this class/callable, and the
+                                instance/return-value will be appended as an item to the returned item list.
+                                if not passed, then the `str` class will be used, which means that the items
+                                of the returned list will be strings of the file/folder path and name.
+                                passing a class, like e.g., :class:`ae.files.CachedFile`, :class:`ae.files.CachedFile`
+                                or :class:`pathlib.Path`, will create instances of this class.
+                                alternatively, you can pass a callable which will be called on each found file/folder.
+                                in this case the return value of the callable will be inserted in the related
+                                item of the returned list.
+                                silly mypy does not support ``Union[Type[Any], Callable[[str, KwArg()], Any]]``.
+    :param creator_kwargs:      additional/optional kwargs passed onto the used item_class apart from the item name.
+    :return:                    iterator/generator yielding a 2-item-tuple for each found/matching file system item.
+                                the first tuple-item is the file/folder type returned by the specified
+                                :paramref:`~coll_item.type_detector` argument, and the second tuple-item is an instance
+                                of the item creator class (specified by the :paramref:`~coll_items.creator` argument).
+    """
+    item_mask = normalize(item_mask, make_absolute=False, remove_dots=False, resolve_sym_links=False)   # substitute '~'
+
+    for coll_arg in searcher(item_mask):
+        if selector(coll_arg):
+            # noinspection PyArgumentList
+            instance = creator(coll_arg, **creator_kwargs)
+            yield type_detector(coll_arg), instance
 
 
 copy_file = shutil.copy2
@@ -644,6 +644,7 @@ def path_join(*parts: str) -> str:
     return '/'.join(_ for _ in parts[part_index:] if _).replace('//', '/')
 
 
+# noinspection GrazieInspection
 _path_match_tokens_to_re = {
     # order of ``**/`` and ``/**`` in the RE tokenization pattern doesn't matter because ``**/`` will be caught first
     # no matter what, making ``/**`` the only option later on.
@@ -739,6 +740,27 @@ def placeholder_path(path: str) -> str:
         if path == val or path.startswith(val + os_path_sep):
             return '{' + key + '}' + path[len(val):]
     return path
+
+
+def relative_file_paths(root_path: str, path_masks: list[str], skip_file_path: Callable[[str], bool] = lambda _: False
+                        ) -> set[str]:
+    """ find all files underneath the specified root path, e.g. to collect the .py modules of a python package.
+
+    :param root_path:           path of the root folder. pass empty string to use the current working directory.
+    :param path_masks:          list of folder or subpackage path masks with glob-wildcards, relative to the root path.
+    :param skip_file_path:      called for each found file with their file path (relative to project root folder in
+                                :paramref:`~relative_file_paths.root_path`) as argument, returning True to
+                                exclude/skip the specified file.
+    :return:                    set of file paths relative to the root folder specified by the argument
+                                :paramref:`~relative_file_paths.root_path`.
+    """
+    file_paths = set()
+    for path_mask in path_masks:
+        for file_path in glob.glob(os_path_join(root_path, path_mask), recursive=True):
+            if os_path_isfile(file_path) and not skip_file_path(file_path):
+                file_paths.add(os_path_relpath(file_path, root_path))
+
+    return file_paths
 
 
 def series_file_name(file_path: str, digits: int = 2, marker: str = " ", create: bool = False) -> str:
