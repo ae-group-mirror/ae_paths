@@ -9,11 +9,12 @@ from unittest.mock import patch
 from ae.base import (CFG_EXT, INI_EXT, PY_CACHE_FOLDER, TESTS_FOLDER,
                      app_name_guess, format_given, os_platform, write_file)
 from ae.files import read_file_text, write_file_text, CachedFile, RegisteredFile
+
 from ae.paths import (PATH_PLACEHOLDERS,
                       add_common_storage_paths, app_data_path, app_docs_path, coll_folders, coll_items,
                       copy_files, move_files, normalize, path_files, path_folders, path_items, path_join, path_match,
-                      path_name, paths_match, placeholder_key, placeholder_path, series_file_name, skip_py_cache_files,
-                      user_data_path, user_docs_path,
+                      path_name, paths_match, placeholder_key, placeholder_path, series_file_name, relative_file_paths,
+                      skip_py_cache_files, user_data_path, user_docs_path,
                       Collector, FilesRegister)
 
 try:
@@ -144,6 +145,31 @@ class TestHelpers:
         assert list(paths_match(['c.py'], ['**/*.py', 'file.name'])) == ['c.py']
         assert list(paths_match(['file.name', 'x.y'], ['**/*.d', 'file.name'])) == ['file.name']
         assert list(paths_match(['c.py'], ['**/*.d', 'file.name'])) == []
+
+    def test_relative_file_paths(self):
+        assert relative_file_paths("", []) == set()
+        assert not relative_file_paths("", [])
+        assert not relative_file_paths("", ['NonExistingPackageName'])
+
+        files = relative_file_paths("", ['*'])
+
+        assert files
+        assert 'setup.py' in files
+        assert not any(os.path.sep in _ for _ in files)
+        assert not any(_.startswith('.') for _ in files)
+
+        files = relative_file_paths("", ['.*'])
+
+        assert files
+        assert '.gitignore' in files
+        assert not any(os.path.sep in _ for _ in files)
+        assert all(_.startswith('.') for _ in files)
+
+        files = relative_file_paths("", [os.path.join('**', '*.py')])
+
+        assert  files == {'setup.py', 'tests/test_paths.py', 'tests/conftest.py', 'ae/paths.py'}
+
+        assert files == relative_file_paths("", [os.path.join('**', '*')], skip_file_path=lambda fp: fp[-3:] != '.py')
 
     def test_skip_py_cache_files(self):
         assert skip_py_cache_files(PY_CACHE_FOLDER)
