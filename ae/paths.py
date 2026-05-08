@@ -155,9 +155,10 @@ with a name that contains the string `'xxx'` or is starting with `'yyy'` or is e
 
 .. hint:: replace empty string in the first argument of :meth:`~Collector.collect` with '{cwd}' to get absolute paths.
 
-the following example is collecting the absolute paths of files with the name `xxx.cfg` from all the found
-locations/folders, starting to search in the current working directory ({cwd}), then in the folder above the application
-data folder ({app}), and finally in a folder with the name of the main application underneath the user data folder::
+the following example is first collecting the absolute paths of files with the name `xxx.cfg` from all the found
+locations/folders. then it is starting to search in the current working directory ({cwd}), in the folder above the
+application data folder ({app}), and finally in a folder with the name of the main application underneath the
+user data folder ({usr})::
 
     coll = Collector()
     coll.collect("{cwd}", "{app}/..", "{usr}/{main_app_name}", append="xxx.cfg")
@@ -247,6 +248,7 @@ in the resources folder are provided as one dict item::
 for more complex selections you can use callables passed into the :paramref:`~FilesRegister.find_file.property_matcher`
 and :paramref:`~FilesRegister.find_file.file_sorter` arguments of :meth:`~FilesRegister.find_file`.
 """
+# pylint: disable=too-many-lines
 import glob
 import os
 import re
@@ -260,13 +262,14 @@ from pathlib import PurePath
 from typing import Any, Callable, Iterable, Optional, Type, Union
 
 from ae.base import (                                                                       # type: ignore
-    PY_CACHE_FOLDER, app_name_guess, env_str, format_given, norm_path,
+    PY_CACHE_FOLDER, env_str, format_given, norm_path,
     os_path_basename, os_path_dirname, os_path_expanduser, os_path_isdir, os_path_isfile, os_path_join,
-    os_path_relpath, os_path_sep, os_path_splitext, os_platform)
+    os_path_relpath, os_path_sep, os_path_splitext)
+from ae.system import app_name_guess, os_platform                                           # type: ignore
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile                 # type: ignore
 
 
-__version__ = '0.3.43'
+__version__ = '0.3.44'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
@@ -297,6 +300,7 @@ SearcherType = Callable[[str], SearcherRetType]
 """ type of the callable :paramref:`~coll_items.searcher` argument of :func:`coll_items` """
 
 
+# pylint: disable=too-many-branches
 def add_common_storage_paths():
     """ add common storage paths to :data:`PATH_PLACEHOLDERS` depending on the operating system (OS).
 
@@ -352,7 +356,9 @@ def add_common_storage_paths():
         try:
             from ctypes import windll, create_unicode_buffer        # pylint: disable=import-outside-toplevel
 
+            # noinspection PyUnresolvedReferences
             bitmask = windll.kernel32.GetLogicalDrives()
+            # noinspection PyUnresolvedReferences
             get_volume_information = windll.kernel32.GetVolumeInformationW
             for letter in string.ascii_uppercase:
                 drive = letter + ':' + os_path_sep
@@ -373,6 +379,7 @@ def app_data_path() -> str:
 
     :return:                    path string of the user app data folder.
     """
+    # noinspection PyTypeChecker
     return os_path_join(user_data_path(), PATH_PLACEHOLDERS.get('main_app_name', PATH_PLACEHOLDERS['app_name']))
 
 
@@ -383,6 +390,7 @@ def app_docs_path() -> str:
 
     :return:                    path string of the user documents app folder.
     """
+    # noinspection PyTypeChecker
     return os_path_join(user_docs_path(), PATH_PLACEHOLDERS.get('main_app_name', PATH_PLACEHOLDERS['app_name']))
 
 
@@ -436,7 +444,7 @@ def coll_items(item_mask: str,
                ) -> CollYieldItems:
     """ determine path-/file-like item(s) specified with optional wildcards by :paramref:`~coll_items.item_mask`.
 
-    :param item_mask:           file path mask with optional :func:`~glob.glob` wildcards, the '~' shortcut for the
+    :param item_mask:           file path mask with optional :func:`~glob.glob` wildcards, the "~" shortcut for the
                                 home folder path and any :data:`path placeholders <PATH_PLACEHOLDERS>`, which is
                                 specifying the files/folders to collect. use the '**' glob wildcard in a path to include
                                 also items from subfolders deeper than one level.
@@ -462,7 +470,7 @@ def coll_items(item_mask: str,
                                 :paramref:`~coll_item.type_detector` argument, and the second tuple-item is an instance
                                 of the item creator class (specified by the :paramref:`~coll_items.creator` argument).
     """
-    item_mask = normalize(item_mask, make_absolute=False, remove_dots=False, resolve_sym_links=False)   # substitute '~'
+    item_mask = normalize(item_mask, make_absolute=False, remove_dots=False, resolve_sym_links=False)   # substitute "~"
 
     for coll_arg in searcher(item_mask):
         if selector(coll_arg):
@@ -680,7 +688,7 @@ def path_match(path: str, mask: str) -> bool:
         re_mask = _path_match_replacement.sub(lambda _match: _path_match_tokens_to_re[_match.group(0)], re.escape(mask))
         match = bool(re.fullmatch(re_mask, path))
     else:
-        # noinspection PyUnresolvedReferences
+        # noinspection PyUnresolvedReferences,PyUnusedLocal
         match = PurePath(path).full_match(mask)                 # pragma: no cover # pylint: disable=no-member
     return match
 
@@ -817,18 +825,18 @@ def user_data_path() -> str:
         data_path = file_p.getAbsolutePath()
 
     elif os_platform in ('win32', 'cygwin'):
-        data_path = env_str('APPDATA')
+        data_path = env_str('APPDATA') or "~"
 
     else:
         if os_platform == 'ios':
-            data_path = 'Documents'
+            data_path = "Documents"
         elif os_platform == 'darwin':
-            data_path = os_path_join('Library', 'Application Support')
+            data_path = os_path_join("Library", "Application Support")
         else:                                       # platform == 'linux' or 'freebsd' or anything else
-            data_path = env_str('XDG_CONFIG_HOME') or '.config'
+            data_path = env_str('XDG_CONFIG_HOME') or ".config"
 
         if not os.path.isabs(data_path):
-            data_path = os_path_expanduser(os_path_join('~', data_path))
+            data_path = os_path_expanduser(os_path_join("~", data_path))
 
     return data_path
 
@@ -847,11 +855,12 @@ def user_docs_path() -> str:
         docs_path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS).getAbsolutePath()
 
     elif os_platform in ('win32', 'cygwin'):
-        docs_path = os_path_join(env_str('USERPROFILE'), 'Documents')
+        docs_path = os_path_join(env_str('USERPROFILE') or "~", "Documents")
 
     else:
-        docs_path = os_path_expanduser(os_path_join('~', 'Documents'))
+        docs_path = os_path_expanduser(os_path_join("~", "Documents"))
 
+    # noinspection PyTypeChecker
     return docs_path
 
 
@@ -1054,9 +1063,9 @@ class FilesRegister(dict):
                                 values greater than n (==len(file_list)) will append the file_obj to the end of the file
                                 object list. the order of the added items will be unchanged if this value is greater
                                 or equal to zero. negative values will add the found items in reversed
-                                order and **after** the item specified by this index value (so passing -1 will append
+                                order, and **after** the item specified by this index value. so passing -1 will append
                                 the items to the end in reversed order, while passing -(n+1) will insert them at the
-                                beginning in reversed order).
+                                beginning in reversed order.
         :param file_class:      the used file object class (see :data:`FileObject`). each found file object will be
                                 passed to the class constructor (callable) and added to the list, which is an item of
                                 this dict.
@@ -1079,9 +1088,9 @@ class FilesRegister(dict):
                                 values greater than n (==len(file_list)) will append the file_obj to the end of the file
                                 object list. the order of the added items will be unchanged if this value is greater
                                 or equal to zero. negative values will add the found items in reversed
-                                order and **after** the item specified by this index value (so passing -1 will append
+                                order, and **after** the item specified by this index value. so passing -1 will append
                                 the items to the end in reversed order, while passing -(n+1) will insert them at the
-                                beginning in reversed order).
+                                beginning in reversed order.
         :return:                list of paths of the added files.
         """
         added_file_paths = []
