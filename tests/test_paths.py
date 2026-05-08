@@ -7,7 +7,8 @@ import shutil
 from unittest.mock import patch
 
 from ae.base import (CFG_EXT, INI_EXT, PY_CACHE_FOLDER, TESTS_FOLDER,
-                     app_name_guess, format_given, os_platform, write_file)
+                     format_given, write_file)
+from ae.system import app_name_guess, os_platform 
 from ae.files import read_file_text, write_file_text, CachedFile, RegisteredFile
 
 from ae.paths import (PATH_PLACEHOLDERS,
