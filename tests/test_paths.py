@@ -32,16 +32,16 @@ file_without_properties = os.path.join(file_root, file_name + file_ext)
 file_properties = {'int': 72, 'float': 1.5, 'str': 'value'}
 
 root_files = ['setup.py']
-mod_files = ['ae/paths.py']
+mod_files = ["ae/paths.py"]
 tst_paths = ['tests']
-tst_files = ['tests/conftest.py', 'tests/test_paths.py']
-tst_sub_folder = 'tests/sub_dir'
-tst_sub_py_files1 = [f'{tst_sub_folder}/tst_sub_file.py']
-tst_sub_files1 = tst_sub_py_files1 + [f'{tst_sub_folder}/tst_sub_wo_extension']
-tst_sub_sub_folder = f'{tst_sub_folder}/sub_dir2'
-tst_sub_py_files2 = [f'{tst_sub_sub_folder}/tst_sub_sub_file.py']
-tst_sub_files2 = tst_sub_py_files2 + [f'{tst_sub_sub_folder}/tst_sub_sub_wo_extension']
-tst_sub_py_files = sorted([_ for _ in tst_sub_files1 + tst_sub_files2 if os.path.splitext(_)[1] == '.py'])
+tst_files = ["tests/conftest.py", "tests/test_paths.py"]
+tst_sub_folder = "tests/sub_dir"
+tst_sub_py_files1 = [f"{tst_sub_folder}/tst_sub_file.py"]
+tst_sub_files1 = tst_sub_py_files1 + [f"{tst_sub_folder}/tst_sub_wo_extension"]
+tst_sub_sub_folder = f"{tst_sub_folder}/sub_dir2"
+tst_sub_py_files2 = [f"{tst_sub_sub_folder}/tst_sub_sub_file.py"]
+tst_sub_files2 = tst_sub_py_files2 + [f"{tst_sub_sub_folder}/tst_sub_sub_wo_extension"]
+tst_sub_py_files = sorted([_ for _ in tst_sub_files1 + tst_sub_files2 if os.path.splitext(_)[1] == ".py"])
 tst_all_py_files = sorted(root_files + mod_files + tst_files + tst_sub_py_files)
 
 
@@ -80,50 +80,50 @@ def file_sorter_mock(file):
 
 class TestHelpers:
     def test_path_join(self):
-        assert path_join('') == os.path.join('')
+        assert path_join("") == os.path.join("")
         assert path_join('part') == os.path.join('part')
         assert path_join('part', 'part2') == os.path.join('part', 'part2')
         assert path_join('part', '', 'part2') == os.path.join('part', '', 'part2')
-        assert path_join('part', '.', 'part2') == os.path.join('part', '.', 'part2')
-        assert path_join('part', '..', 'part2') == os.path.join('part', '..', 'part2')
-        assert path_join('part', '/part2') == os.path.join('part', '/part2')
-        assert path_join('part', '/', 'part2') == os.path.join('part', '/', 'part2')
-        assert path_join('part', '//', 'part2') == os.path.join('part', '//', 'part2')
-        assert path_join('/part', 'part2') == os.path.join('/part', 'part2')
+        assert path_join('part', ".", 'part2') == os.path.join('part', ".", 'part2')
+        assert path_join('part', "..", 'part2') == os.path.join('part', "..", 'part2')
+        assert path_join('part', "/part2") == os.path.join('part', "/part2")
+        assert path_join('part', "/", 'part2') == os.path.join('part', "/", 'part2')
+        assert path_join('part', "//", 'part2') == os.path.join('part', "//", 'part2')
+        assert path_join("/part", 'part2') == os.path.join("/part", 'part2')
         assert path_join('', 'part2') == os.path.join('', 'part2')
 
-        assert path_join('part', '') == 'part'  # os.path.join() returns 'part/' in this case
+        assert path_join('part', '') == 'part'  # os.path.join() returns "part/" in this case
         assert path_join('part', '') != os.path.join('part', '')
 
     def test_path_match(self):
-        assert path_match('c.py', '?.py')
-        assert path_match('c.py', '?.p?')
-        assert not path_match('c.py', '??.p?')
-        assert not path_match('c.py', '?.p??')
+        assert path_match('c.py', "?.py")
+        assert path_match('c.py', "?.p?")
+        assert not path_match('c.py', "??.p?")
+        assert not path_match('c.py', "?.p??")
 
-        assert path_match('c.py', '*')
-        assert path_match('c.py', '*.py')
-        assert path_match('c.py', 'c*.py')
+        assert path_match('c.py', "*")
+        assert path_match('c.py', "*.py")
+        assert path_match('c.py', "c.py")
 
-        assert path_match('c.py', '**/*.py')
-        assert path_match('a/b/c.py', '**/*.py')
-        assert path_match('/a/b/c.py', '**/*.py')
-        assert path_match('a/b/c.py', 'a/**')
-        assert path_match('/a/b/c.py', '/a/**')
-        assert path_match('a/b/c.py', 'a/**/b/**')
-        assert path_match('/a/b/c.py', '/a/**/b/**')
-        assert path_match('a/b/c.py', 'a/**/b/**/c.*')
-        assert path_match('/a/b/c.py', '/a/**/b/**/c.*')
-        assert not path_match('a/b/c.py', 'a/*')
-        assert not path_match('/a/b/c.py', 'a/*')
-        assert not path_match('a/b/c.py', 'a**/*.py')
-        assert not path_match('/a/b/c.py', 'a**/*.py')
-        assert not path_match('a/b/c.py', '/a/**')
-        assert not path_match('/a/b/c.py', 'a/**')
+        assert path_match('c.py', "**/*.py")
+        assert path_match("a/b/c.py", "**/*.py")
+        assert path_match("/a/b/c.py", "**/*.py")
+        assert path_match("a/b/c.py", "a/**")
+        assert path_match("/a/b/c.py", "/a/**")
+        assert path_match("a/b/c.py", "a/**/b/**")
+        assert path_match("/a/b/c.py", "/a/**/b/**")
+        assert path_match("a/b/c.py", "a/**/b/**/c.*")
+        assert path_match("/a/b/c.py", "/a/**/b/**/c.*")
+        assert not path_match("a/b/c.py", "a/*")
+        assert not path_match("/a/b/c.py", "a/*")
+        assert not path_match("a/b/c.py", "a**/*.py")
+        assert not path_match("/a/b/c.py", "a**/*.py")
+        assert not path_match("a/b/c.py", "/a/**")
+        assert not path_match("/a/b/c.py", "a/**")
 
-        assert path_match('abc.py', '[axy]bc.py')
-        assert path_match('abc.py', 'ab[cxy].py')
-        assert path_match('abc.py', 'ab[!dxy].py')
+        assert path_match('abc.py', "[axy]bc.py")
+        assert path_match('abc.py', "ab[cxy].py")
+        assert path_match('abc.py', "ab[!dxy].py")
 
     def test_path_name(self):
         assert path_name("") == ""
@@ -140,44 +140,44 @@ class TestHelpers:
                 assert path_name(path) in names
 
     def test_paths_match(self):
-        assert list(paths_match(['c.py'], ['**/*.py'])) == ['c.py']
-        assert list(paths_match(['a.py', 'a/b/c.d'], ['**/*.py'])) == ['a.py']
-        assert set(paths_match(['a.py', 'a/b/c.py'], ['**/*.py'])) == {'a.py', 'a/b/c.py'}
-        assert list(paths_match(['c.py'], ['**/*.py', 'file.name'])) == ['c.py']
-        assert list(paths_match(['file.name', 'x.y'], ['**/*.d', 'file.name'])) == ['file.name']
-        assert list(paths_match(['c.py'], ['**/*.d', 'file.name'])) == []
+        assert list(paths_match(['c.py'], ["**/*.py"])) == ['c.py']
+        assert list(paths_match(['a.py', "a/b/c.d"], ["**/*.py"])) == ['a.py']
+        assert set(paths_match(['a.py', "a/b/c.py"], ["**/*.py"])) == {'a.py', "a/b/c.py"}
+        assert list(paths_match(['c.py'], ["**/*.py", 'file.name'])) == ['c.py']
+        assert list(paths_match(['file.name', 'x.y'], ["**/*.d", 'file.name'])) == ['file.name']
+        assert list(paths_match(['c.py'], ["**/*.d", 'file.name'])) == []
 
     def test_relative_file_paths(self):
         assert relative_file_paths("", []) == set()
         assert not relative_file_paths("", [])
         assert not relative_file_paths("", ['NonExistingPackageName'])
 
-        files = relative_file_paths("", ['*'])
+        files = relative_file_paths("", ["*"])
 
         assert files
         assert 'setup.py' in files
-        assert not any(os.path.sep in _ for _ in files)
-        assert not any(_.startswith('.') for _ in files)
+        assert not any("/" in _.replace("\\", "/") for _ in files)
+        assert not any(_.startswith(".") for _ in files)
 
-        files = relative_file_paths("", ['.*'])
+        files = relative_file_paths("", [".*"])
 
         assert files
         assert '.gitignore' in files
-        assert not any(os.path.sep in _ for _ in files)
-        assert all(_.startswith('.') for _ in files)
+        assert not any("/" in _.replace("\\", "/") for _ in files)
+        assert all(_.startswith(".") for _ in files)
 
-        files = relative_file_paths("", [os.path.join('**', '*.py')])
+        files = relative_file_paths("", [os.path.join("**", "*.py")])
 
-        assert  files == {'setup.py', 'tests/test_paths.py', 'tests/conftest.py', 'ae/paths.py'}
+        assert files == {'setup.py', "tests/test_paths.py", "tests/conftest.py", "ae/paths.py"}
 
-        assert files == relative_file_paths("", [os.path.join('**', '*')], skip_file_path=lambda fp: fp[-3:] != '.py')
+        assert files == relative_file_paths("", [os.path.join("**", "*")], skip_file_path=lambda fp: fp[-3:] != ".py")
 
     def test_skip_py_cache_files(self):
         assert skip_py_cache_files(PY_CACHE_FOLDER)
-        assert skip_py_cache_files(f'a/c/c/{PY_CACHE_FOLDER}')
-        assert skip_py_cache_files(f'/a/c/c/{PY_CACHE_FOLDER}')
-        assert skip_py_cache_files(f'a/c/c/{PY_CACHE_FOLDER}/.')
-        assert skip_py_cache_files(f'a/c/c/{PY_CACHE_FOLDER}/x.py')
+        assert skip_py_cache_files(f"a/c/c/{PY_CACHE_FOLDER}")
+        assert skip_py_cache_files(f"/a/c/c/{PY_CACHE_FOLDER}")
+        assert skip_py_cache_files(f"a/c/c/{PY_CACHE_FOLDER}/.")
+        assert skip_py_cache_files(f"a/c/c/{PY_CACHE_FOLDER}/x.py")
 
 
 class TestPlaceholders:
@@ -267,7 +267,7 @@ class TestPlaceholders:
         f_name = "test.tst"
         file_path = os.path.join(os.getcwd(), f_name)
         assert placeholder_path(f_name) == f_name
-        assert placeholder_path(file_path) == "{cwd}" + os.path.sep + f_name
+        assert placeholder_path(file_path) == "{cwd}" + "/" + f_name
         assert placeholder_path(file_path).format(**PATH_PLACEHOLDERS) == file_path
         assert format_given(placeholder_path(file_path), PATH_PLACEHOLDERS) == file_path
         assert normalize(placeholder_path(file_path)) == file_path
@@ -384,7 +384,7 @@ def files_to_test():
     write_file(file_without_properties, CONTENT0)
 
     for name, value in file_properties.items():
-        fn = os.path.join(fn, name + '_' + str(value))
+        fn = os.path.join(fn, name + "_" + str(value))
         os.mkdir(fn)
     fn = os.path.join(fn, file_name + file_ext)
     write_file(fn, CONTENT0)
@@ -598,9 +598,9 @@ class TestPathFiles:
         assert len(path_files("{cwd}")) == len(path_files("."))
         assert path_files("{cwd}/ae/paths.py")[0].endswith("/ae_paths/ae/paths.py")
 
-        assert len(path_files("{cwd}/**/*.py")) == 4    # ...setup.py, ...paths.py, ...test_paths.py, ...conftest.py
+        assert len(path_files("{cwd}/**/*.py")) == 4  # ...setup.py, ...paths.py, ...test_paths.py, ...conftest.py
         assert all(_.endswith(".py") for _ in path_files("{cwd}/**/*.py"))
-        assert all(_.startswith(os.path.sep) for _ in path_files("{cwd}/**/*.py"))
+        assert all(_.startswith("/") for _ in path_files("{cwd}/**/*.py"))
 
     def test_wildcards(self):
         assert path_files("*.py") == ["setup.py"]
@@ -714,7 +714,7 @@ class TestPathFolders:
         assert path_folders("{cwd}/**")
         assert any(_.endswith("/ae_paths/ae") for _ in path_folders("{cwd}/**"))
         assert any(_.endswith("/ae_paths/tests") for _ in path_folders("{cwd}/**"))
-        assert all(_.startswith(os.path.sep) for _ in path_folders("{cwd}/**"))
+        assert all(_.startswith("/") for _ in path_folders("{cwd}/**"))
 
     def test_wildcards(self):
         assert path_folders("*.py") == []
@@ -824,7 +824,7 @@ class TestPathItems:
 
         assert len(path_items("{cwd}/**/*.py")) == 4    # ...setup.py, ...paths.py, ...test_paths.py, ...conftest.py
         assert all(_.endswith(".py") for _ in path_items("{cwd}/**/*.py"))
-        assert all(_.startswith(os.path.sep) for _ in path_items("{cwd}/**/*.py"))
+        assert all(_.startswith("/") for _ in path_items("{cwd}/**/*.py"))
 
     def test_wildcards(self):
         assert path_items("*.py") == ["setup.py"]
@@ -910,8 +910,8 @@ class TestSeriesFileName:
     def test_series_file_name_conflict(self):
         file_mask = "tests/series_tests*.tst"
         try:
-            open(file_mask.replace('*', ' aaa'), 'w').close()
-            open(file_mask.replace('*', ' 04'), 'w').close()
+            open(file_mask.replace("*", " aaa"), 'w').close()
+            open(file_mask.replace("*", " 04"), 'w').close()
             assert series_file_name("tests/series_tests.tst", create=True) == "tests/series_tests 03.tst"
             assert series_file_name("tests/series_tests.tst") == "tests/series_tests 05.tst"
         finally:
@@ -932,25 +932,25 @@ class TestCollector:
         assert coll.paths == []
         assert coll.files == []
 
-        coll.collect('tests/*')
+        coll.collect("tests/*")
         assert coll.paths == []
-        assert sorted(coll.files) == sorted(tst_files + ['tests/requirements.txt'])
+        assert sorted(coll.files) == sorted(tst_files + ["tests/requirements.txt"])
 
-        coll.collect('tests/*.py')
-        coll.collect('tests/*.txt')
+        coll.collect("tests/*.py")
+        coll.collect("tests/*.txt")
         assert coll.paths == []
-        assert sorted(coll.files) == sorted(2 * (tst_files + ['tests/requirements.txt']))
+        assert sorted(coll.files) == sorted(2 * (tst_files + ["tests/requirements.txt"]))
 
     def test_collect_append_tests_files(self):
         coll = Collector()
-        coll.collect('', append='tests')
+        coll.collect("", append='tests')
         assert coll.paths == []
 
-        coll.collect('tests', append='*.py')
+        coll.collect('tests', append="*.py")
         assert coll.paths == []
         assert sorted(coll.files) == sorted(tst_files)
 
-        coll.collect('', append='tests/*.py')
+        coll.collect("", append="tests/*.py")
         assert coll.paths == []
         assert sorted(coll.files) == sorted(tst_files * 2)
 
@@ -959,12 +959,12 @@ class TestCollector:
         assert sorted(coll.files) == sorted(tst_files * 2)
         assert sorted(coll.selected) == []
 
-        coll.collect('tests', append='')
+        coll.collect('tests', append="")
         assert coll.paths == []
         assert sorted(coll.files) == sorted(tst_files * 2)
         assert sorted(coll.selected) == []
 
-        coll.collect('tests/*.py', append='')
+        coll.collect("tests/*.py", append="")
         assert coll.paths == []
         assert sorted(coll.files) == sorted(tst_files * 3)
         assert sorted(coll.selected) == []
@@ -976,14 +976,14 @@ class TestCollector:
 
     def test_collect_append_tests_folders(self):
         coll = Collector(item_collector=coll_folders)
-        coll.collect('', append='tests')
+        coll.collect("", append='tests')
         assert coll.paths == tst_paths
 
-        coll.collect('tests', append='*.py')
+        coll.collect('tests', append="*.py")
         assert coll.paths == tst_paths
         assert sorted(coll.files) == []
 
-        coll.collect('', append='tests/*.py')
+        coll.collect("", append="tests/*.py")
         assert coll.paths == tst_paths
         assert sorted(coll.files) == []
 
@@ -992,12 +992,12 @@ class TestCollector:
         assert sorted(coll.files) == []
         assert sorted(coll.selected) == tst_paths
 
-        coll.collect('tests', append='')
+        coll.collect('tests', append="")
         assert coll.paths == tst_paths * 3
         assert sorted(coll.files) == []
         assert sorted(coll.selected) == tst_paths
 
-        coll.collect('tests/*.py', append='')
+        coll.collect("tests/*.py", append="")
         assert coll.paths == tst_paths * 3
         assert sorted(coll.files) == []
         assert sorted(coll.selected) == tst_paths
@@ -1009,14 +1009,14 @@ class TestCollector:
 
     def test_collect_append_tests_items(self):
         coll = Collector(item_collector=coll_items)
-        coll.collect('', append='tests')
+        coll.collect("", append='tests')
         assert coll.paths == tst_paths
 
-        coll.collect('tests', append='*.py')
+        coll.collect('tests', append="*.py")
         assert coll.paths == tst_paths
         assert sorted(coll.files) == sorted(tst_files)
 
-        coll.collect('', append='tests/*.py')
+        coll.collect('', append="tests/*.py")
         assert coll.paths == tst_paths
         assert sorted(coll.files) == sorted(tst_files * 2)
 
@@ -1025,12 +1025,12 @@ class TestCollector:
         assert sorted(coll.files) == sorted(tst_files * 2)
         assert sorted(coll.selected) == tst_paths
 
-        coll.collect('tests', append='')
+        coll.collect('tests', append="")
         assert coll.paths == tst_paths * 3
         assert sorted(coll.files) == sorted(tst_files * 2)
         assert sorted(coll.selected) == tst_paths
 
-        coll.collect('tests/*.py', append='')
+        coll.collect("tests/*.py", append="")
         assert coll.paths == tst_paths * 3
         assert sorted(coll.files) == sorted(tst_files * 3)
         assert sorted(coll.selected) == tst_paths
@@ -1042,88 +1042,88 @@ class TestCollector:
 
     def test_collect_select_tests_files(self):
         coll = Collector()      # item_collector=coll_files is the default argument
-        coll.collect('', select='tests')
+        coll.collect("", select='tests')
         assert coll.paths == []
         assert sorted(coll.selected) == []
 
-        coll.collect('tests', select='*.py')
+        coll.collect('tests', select="*.py")
         assert coll.paths == []
         assert sorted(coll.files) == tst_files
         assert sorted(coll.selected) == tst_files
 
-        coll.collect('', select='tests/*.py')
+        coll.collect("", select="tests/*.py")
         assert coll.paths == []
         assert sorted(coll.files) == sorted(tst_files * 2)
         assert sorted(coll.selected) == sorted(tst_files * 2)
 
-        coll.collect('tests', select='')
+        coll.collect('tests', select="")
         assert coll.paths == []
         assert sorted(coll.files) == sorted(tst_files * 2)
         assert sorted(coll.selected) == sorted(tst_files * 2)
 
-        coll.collect('tests/*.py')      # collect select kwarg defaults to ''
+        coll.collect("tests/*.py")      # collect select kwarg defaults to ""
         assert coll.paths == []
         assert sorted(coll.files) == sorted(tst_files * 3)
         assert sorted(coll.selected) == sorted(tst_files * 3)
 
         assert coll.failed == 2
         assert coll.error_message
-        assert dict(coll.prefix_failed) == {'': 1, 'tests': 1}
-        assert dict(coll.suffix_failed) == {'': 1, 'tests': 1}
+        assert dict(coll.prefix_failed) == {"": 1, 'tests': 1}
+        assert dict(coll.suffix_failed) == {"": 1, 'tests': 1}
 
     def test_collect_select_tests_folders(self):
         coll = Collector(item_collector=coll_folders)
-        coll.collect('', select='tests')
+        coll.collect("", select='tests')
         assert coll.paths == tst_paths
         assert sorted(coll.selected) == tst_paths
 
-        coll.collect('tests', select='*.py')
+        coll.collect('tests', select="*.py")
         assert coll.paths == tst_paths
         assert sorted(coll.files) == []
         assert sorted(coll.selected) == ['tests']
 
-        coll.collect('', select='tests/*.py')
+        coll.collect("", select="tests/*.py")
         assert coll.paths == tst_paths
         assert sorted(coll.files) == []
         assert sorted(coll.selected) == sorted(tst_paths)
 
-        coll.collect('tests', select='')
+        coll.collect('tests', select="")
         assert coll.paths == tst_paths * 2
         assert sorted(coll.files) == []
         assert sorted(coll.selected) == sorted(tst_paths * 2)
 
-        coll.collect('tests/*.py')      # collect select kwarg defaults to ''
+        coll.collect("tests/*.py")      # collect select kwarg defaults to ""
         assert coll.paths == tst_paths * 2
         assert sorted(coll.files) == []
         assert sorted(coll.selected) == sorted(tst_paths * 2)
 
         assert coll.failed == 3
         assert coll.error_message
-        assert dict(coll.prefix_failed) == {'': 1, 'tests/*.py': 1, 'tests': 1}
-        assert dict(coll.suffix_failed) == {'': 1, 'tests/*.py': 1, '*.py': 1}
+        assert dict(coll.prefix_failed) == {"": 1, "tests/*.py": 1, 'tests': 1}
+        assert dict(coll.suffix_failed) == {"": 1, "tests/*.py": 1, "*.py": 1}
 
     def test_collect_select_tests_items(self):
         coll = Collector(item_collector=coll_items)
-        coll.collect('', select='tests')
+        coll.collect("", select='tests')
         assert coll.paths == tst_paths
         assert sorted(coll.selected) == tst_paths
 
-        coll.collect('tests', select='*.py')
+        coll.collect('tests', select="*.py")
         assert coll.paths == tst_paths
         assert sorted(coll.files) == tst_files
         assert sorted(coll.selected) == tst_paths + tst_files
 
-        coll.collect('', select='tests/*.py')
+        coll.collect("", select="tests/*.py")
         assert coll.paths == tst_paths
         assert sorted(coll.files) == sorted(tst_files * 2)
         assert sorted(coll.selected) == sorted(tst_paths + tst_files * 2)
 
-        coll.collect('tests', select='')
+        coll.collect('tests', select="")
         assert coll.paths == tst_paths * 2
         assert sorted(coll.files) == sorted(tst_files * 2)
         assert sorted(coll.selected) == sorted(tst_paths * 2 + tst_files * 2)
 
-        coll.collect('tests/*.py')      # collect select kwarg defaults to ''
+        coll.collect("tests/*.py")      # collect select kwarg defaults to ""
         assert coll.paths == tst_paths * 2
         assert sorted(coll.files) == sorted(tst_files * 3)
         assert sorted(coll.selected) == sorted(tst_paths * 2 + tst_files * 3)
@@ -1160,8 +1160,8 @@ class TestCollector:
     def test_collect_appends(self):
         coll = Collector(item_collector=coll_items, app="ae", tst="tests")
         coll.collect("{app}", "ae", "", append=("{app_name}", "paths.py", "", "ae"))
-        assert coll.paths == ['ae', 'ae', '.', 'ae']
-        assert coll.files == ['ae/paths.py', 'ae/paths.py']
+        assert coll.paths == ['ae', 'ae', ".", 'ae']
+        assert coll.files == ["ae/paths.py", "ae/paths.py"]
         assert not coll.selected
         assert coll.failed == 0
         assert not coll.error_message
@@ -1170,7 +1170,7 @@ class TestCollector:
         coll = Collector(app="ae", tst="tests")
         coll.collect("{app}", "ae", "", append=("{app_name}", "paths.py", "", "ae"))
         assert not coll.paths       # 'ae' not in coll.paths because the prefix of ae/paths.py gets found before ""/ae
-        assert coll.files == ['ae/paths.py', 'ae/paths.py']
+        assert coll.files == ["ae/paths.py", "ae/paths.py"]
         assert not coll.selected
         assert coll.failed == 0
         assert not coll.error_message
@@ -1179,8 +1179,8 @@ class TestCollector:
         coll = Collector(app="ae", tst="tests", main_app_name=__file__)
         coll.collect("{app}", "ae", "", append="{main_app_name}")
         assert not coll.paths
-        assert len(coll.files) == 1       # ['{cwd}/tests/test_paths.py']
-        assert coll.files[0].endswith('/ae_paths/tests/test_paths.py')
+        assert len(coll.files) == 1       # ["{cwd}/tests/test_paths.py"]
+        assert coll.files[0].endswith("/ae_paths/tests/test_paths.py")
         assert not coll.selected
         assert coll.failed == 0
         assert not coll.error_message
@@ -1190,14 +1190,14 @@ class TestCollector:
         coll.collect("{cwd}", "{app}", "ae",
                      select=(".*", "README.md", "tests/test_paths.py", "", "ae", ))
 
-        assert len(coll.paths) >= 4   # ['{cwd}', '{cwd}/ae', 'ae', 'ae'] + localMachFolders .git/.pylint/.mypy_cache/..
+        assert len(coll.paths) >= 4   # ["{cwd}", "{cwd}/ae", 'ae', 'ae'] + localMachFolders .git/.pylint/.mypy_cache/..
         assert sum(1 for _ in coll.paths if _ == os.getcwd()) == 1
         assert sum(1 for _ in coll.paths if _ == os.path.join(os.getcwd(), 'ae')) == 1
         assert sum(1 for _ in coll.paths if _ == 'ae') == 2
 
         assert 4 <= len(coll.files) <= 6    # .commit_msg.txt and .python-version are missing on CI host
-        # ['{cwd}/.gitignore', '{cwd}/.commit_msg.txt', '{cwd}/.python-version', '{cwd}/.gitlab-ci.yml',
-        #  '{cwd}/README.md', '{cwd}/tests/test_paths.py']
+        # ["{cwd}/.gitignore", "{cwd}/.commit_msg.txt", "{cwd}/.python-version", "{cwd}/.gitlab-ci.yml",
+        #  "{cwd}/README.md", "{cwd}/tests/test_paths.py"]
         assert all(_.startswith(os.getcwd()) for _ in coll.files)
         files = [os.path.basename(_) for _ in coll.files]
         assert '.gitignore' in files
@@ -1214,24 +1214,23 @@ class TestCollector:
         coll.collect("{cwd}", "{app}", "ae", select=".*")
         assert not coll.paths
         assert 2 <= len(coll.files) <= 4
-        # ['{cwd}/.gitignore', '{cwd}/.commit_msg.txt', '{cwd}/.python-version', '{cwd}/.gitlab-ci.yml']
+        # ["{cwd}/.gitignore", "{cwd}/.commit_msg.txt", "{cwd}/.python-version", "{cwd}/.gitlab-ci.yml"]
         assert all(_.startswith(os.getcwd()) for _ in coll.files)
         files = [os.path.basename(_) for _ in coll.files]
         assert '.gitignore' in files
         assert '.gitlab-ci.yml' in files
         assert coll.selected == coll.files
         assert coll.failed == 2
-        assert coll.prefix_failed == {'{app}': 1, 'ae': 1}
-        assert coll.suffix_failed == {'.*': 2}
+        assert coll.prefix_failed == {"{app}": 1, 'ae': 1}
+        assert coll.suffix_failed == {".*": 2}
         assert coll.error_message
 
     def test_collect_select_string(self):
         coll = Collector(app="ae", tst="tests")
-        coll.collect("{cwd}", "{app}", "ae",
-                     select=".*")
+        coll.collect("{cwd}", "{app}", "ae", select=".*")
         assert not coll.paths
         assert 2 <= len(coll.files) <= 4
-        # ['{cwd}/.gitignore', '{cwd}/.gitlab-ci.yml'] only .commit_msg.txt|.python-version not existing on CI host
+        # ["{cwd}/.gitignore", "{cwd}/.gitlab-ci.yml"] only .commit_msg.txt|.python-version not existing on CI host
         assert all(_.startswith(os.getcwd()) for _ in coll.files)
         files = [os.path.basename(_) for _ in coll.files]
         assert '.gitignore' in files
@@ -1242,10 +1241,10 @@ class TestCollector:
 
     def test_collect_prefixes_only(self):
         coll = Collector(item_collector=coll_items, app="ae", tst="tests")
-        coll.collect("{app}", "{usr}", 'tests/test_paths.py')
-        assert 1 <= len(coll.paths) <= 2   # ['ae', '/home/andi/.config'], CI: [..., '/builds/ae-group/ae_paths...']
+        coll.collect("{app}", "{usr}", "tests/test_paths.py")
+        assert 1 <= len(coll.paths) <= 2   # ['ae', "/home/andi/.config"], CI: [..., "/builds/ae-group/ae_paths..."]
         assert 'ae' in coll.paths
-        assert coll.files == ['tests/test_paths.py']
+        assert coll.files == ["tests/test_paths.py"]
         assert coll.selected == coll.paths + coll.files
         assert coll.failed == 0
         assert not coll.error_message
@@ -1253,7 +1252,7 @@ class TestCollector:
     def test_collect_prefixes_as_relative_and_duplicate_absolute_folder_paths(self):
         coll = Collector(item_collector=coll_folders, app="ae", usr="ae")
         coll.collect('{app}', '{cwd}', '{usr}')
-        # assert coll.paths == ['ae', '/home/andi/src/ae_paths', 'ae'] != CI: ['ae', '/builds/ae-group/ae_paths', 'ae']
+        # assert coll.paths == ['ae', "/home/andi/src/ae_paths", 'ae'] != CI: ['ae', "/builds/ae-group/ae_paths", 'ae']
         assert coll.paths == ['ae', normalize('{cwd}'), 'ae']
         assert not coll.files
         assert coll.selected == ['ae', normalize('{cwd}'), 'ae']
@@ -1262,35 +1261,35 @@ class TestCollector:
 
     def test_wildcard_recursive(self, test_sub_files):
         coll = Collector()
-        coll.collect('*.py')
+        coll.collect("*.py")
         assert coll.files == ['setup.py']
 
         coll = Collector()
-        coll.collect('', append='*.py')
+        coll.collect("", append="*.py")
         assert coll.files == ['setup.py']
 
         coll = Collector()
-        coll.collect('**', append='*.py')
+        coll.collect("**", append="*.py")
         assert sorted(coll.files) == tst_all_py_files
 
         coll = Collector()
-        coll.collect('*', append='*.py')
+        coll.collect("*", append="*.py")
         assert sorted(coll.files) == sorted(mod_files + tst_files)
 
         coll = Collector()
-        coll.collect('*/*', append='*.py')
+        coll.collect("*/*", append="*.py")
         assert sorted(coll.files) == tst_sub_py_files1
 
         coll = Collector()
-        coll.collect('*/*/*', append='*.py')
+        coll.collect("*/*/*", append="*.py")
         assert sorted(coll.files) == tst_sub_py_files2
 
         coll = Collector()
-        coll.collect('**/*', append='*.py')
+        coll.collect("**/*", append="*.py")
         assert sorted(coll.files) == sorted(mod_files + tst_files + tst_sub_py_files)
 
         coll = Collector()
-        coll.collect('*/**', append='*.py')
+        coll.collect("*/**", append="*.py")
         assert sorted(coll.files) == sorted(mod_files + tst_files + tst_sub_py_files)
 
         assert coll.failed == 0
@@ -1369,7 +1368,7 @@ class TestFilesRegister:
 
     def test_add_path_init(self, files_to_test):
         wop, wip = files_to_test
-        fr = FilesRegister(os.path.join(file_root, '**'))
+        fr = FilesRegister(os.path.join(file_root, "**"))
         assert len(fr) == 1
         assert file_name in fr
         files = fr[file_name]
@@ -1381,9 +1380,9 @@ class TestFilesRegister:
 
     def test_add_path_redirect(self, files_to_test):
         wop, wip = files_to_test
-        fri = FilesRegister(os.path.join(file_root, '**'))
+        fri = FilesRegister(os.path.join(file_root, "**"))
         fr = FilesRegister()
-        assert len(fr.add_paths(os.path.join(file_root, '**'))) == len(files_to_test)
+        assert len(fr.add_paths(os.path.join(file_root, "**"))) == len(files_to_test)
         assert len(fri) == len(fr)
         assert file_name in fr
         files = fr[file_name]
@@ -1395,13 +1394,13 @@ class TestFilesRegister:
 
         old_len = len(fr)
         assert 'test_files' not in fr
-        fr.add_file('tests/test_files.py')
+        fr.add_file("tests/test_files.py")
         assert old_len < len(fr)
         assert 'test_files' in fr
 
     def test_cache_file_class(self, files_to_test):
         wop, wip = files_to_test
-        fr = FilesRegister(os.path.join(file_root, '**'), file_class=CachedFile, object_loader=file_loader_mock_func)
+        fr = FilesRegister(os.path.join(file_root, "**"), file_class=CachedFile, object_loader=file_loader_mock_func)
         assert len(fr) == 1
         assert file_name in fr
         files = fr[file_name]
@@ -1420,46 +1419,54 @@ class TestFilesRegister:
 
     def test_find_file_by_name(self, files_to_test):
         assert file_name in files_to_test[1]
-        fr = FilesRegister(os.path.join(file_root, '**'))
-        assert fr.find_file(file_name).stem == file_name
+        fr = FilesRegister(os.path.join(file_root, "**"))
+        assert isinstance(fr, FilesRegister)
+        ff = fr.find_file(file_name)
+        assert isinstance(ff, RegisteredFile)
+        assert ff.stem == file_name
 
     def test_find_file_by_properties(self, files_to_test):
         assert file_name in files_to_test[1]
-        fr = FilesRegister(os.path.join(file_root, '**'))
+        fr = FilesRegister(os.path.join(file_root, "**"))
         ff = fr.find_file(file_name, properties=file_properties)
-        assert ff
+        assert isinstance(ff, RegisteredFile)
         assert ff.stem == file_name
         assert ff.properties == file_properties
 
     def test_find_file_by_property_matcher(self, files_to_test):
         assert file_name in files_to_test[1]
-        fr = FilesRegister(os.path.join(file_root, '**'))
+        fr = FilesRegister(os.path.join(file_root, "**"))
+        # noinspection PyTypeChecker
         ff = fr.find_file(file_name, property_matcher=property_matcher_mock)
-        assert ff
+        assert isinstance(ff, RegisteredFile)
         assert ff.stem == file_name
         assert ff.properties == file_properties
 
     def test_find_file_by_property_matcher_and_file_sorter(self, files_to_test):
         assert file_name in files_to_test[1]
-        fr = FilesRegister(os.path.join(file_root, '**'))
+        fr = FilesRegister(os.path.join(file_root, "**"))
+        # noinspection PyTypeChecker
         ff = fr.find_file(file_name, properties=file_properties, file_sorter=file_sorter_mock)
-        assert ff
+        assert isinstance(ff, RegisteredFile)
         assert ff.stem == file_name
         assert ff.properties == file_properties
 
     def test_find_file_by_file_sorter(self, files_to_test):
         assert file_name in files_to_test[1]
-        fr = FilesRegister(os.path.join(file_root, '**'))
+        fr = FilesRegister(os.path.join(file_root, "**"))
+        # noinspection PyTypeChecker
         ff = fr.find_file(file_name, file_sorter=file_sorter_mock)
-        assert ff
+        assert isinstance(ff, RegisteredFile)
         assert ff.stem == file_name
         assert ff.properties == {}      # finds the one without properties because int-default==0
 
     def test_find_file_with_default_property_matcher(self):
+        # noinspection PyTypeChecker
         fr = FilesRegister(property_matcher=property_matcher_mock)
         assert fr.property_watcher is property_matcher_mock
 
     def test_find_file_with_default_file_sorter(self):
+        # noinspection PyTypeChecker
         fr = FilesRegister(file_sorter=file_sorter_mock)
         assert fr.file_sorter is file_sorter_mock
 
@@ -1471,17 +1478,19 @@ class TestFilesRegister:
         assert not fr.values()
 
     def test_init_property_matcher(self):
+        # noinspection PyTypeChecker
         fr = FilesRegister(property_matcher=property_matcher_mock)
         assert fr.property_watcher is property_matcher_mock
 
     def test_init_file_sorter(self):
+        # noinspection PyTypeChecker
         fr = FilesRegister(file_sorter=file_sorter_mock)
         assert fr.file_sorter is file_sorter_mock
 
     def test_reclassify(self):
         fr = FilesRegister()
         fr.add_file('ttt')
-        fr.add_file('dir/ttt')
+        fr.add_file("dir/ttt")
         assert len(fr['ttt']) == 2
 
         assert all(isinstance(file, str) for file in fr['ttt'])

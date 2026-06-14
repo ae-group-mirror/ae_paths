@@ -69,13 +69,13 @@ file/folder collection and classification
 
 more complex collections of files and folder paths, and the grouping of them, can be done
 with the classes :class:`Collector`, described in the underneath section :ref:`collecting files`,
-and :class:`FilesRegister`, described in the section :ref:`file register`.
+and :class:`FilesRegister`, described in the section :ref:`files register`.
 
 use the :ref:`Collector class <collecting files>` for temporary quick file path searches on your
 local file systems as well as on remote servers/hosts. one implementation example is e.g., the method
 :meth:`~ae.pythonanywhere.PythonanywhereApi.deployed_code_files` of the :mod:`ae.pythonanywhere` module.
 
-the class :ref:`FilesRegister <file register>` helps you to create and cache file path
+the class :ref:`FilesRegister <files register>` helps you to create and cache file path
 registers permanently, to quickly find at any time the best fitting match for a requested purpose.
 for example, the :mod:`~ae.gui` portion is using it to dynamically select
 image/font/audio/... resource files depending on the current user preferences, hardware
@@ -183,10 +183,10 @@ the results are provided by the instance attributes :attr:`~Collector.failed`, :
 :attr:`~Collector.suffix_failed`.
 
 
-file register
-^^^^^^^^^^^^^
+files register
+^^^^^^^^^^^^^^
 
-a file register is an instance of the :class:`FilesRegister`, providing a property-based file collection and selection,
+a files register is an instance of the :class:`FilesRegister`, providing a property-based file collection and selection,
 which is e.g., used by the :mod:`ae.gui` ae namespace portion to find and select resource files like icon/image or
 sound files.
 
@@ -264,12 +264,12 @@ from typing import Any, Callable, Iterable, Optional, Type, Union
 from ae.base import (                                                                       # type: ignore
     PY_CACHE_FOLDER, env_str, format_given, norm_path,
     os_path_basename, os_path_dirname, os_path_expanduser, os_path_isdir, os_path_isfile, os_path_join,
-    os_path_relpath, os_path_sep, os_path_splitext)
+    os_path_relpath, os_path_splitext)
 from ae.system import app_name_guess, os_platform                                           # type: ignore
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile                 # type: ignore
 
 
-__version__ = '0.3.44'
+__version__ = '0.3.45'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
@@ -343,7 +343,7 @@ def add_common_storage_paths():
         places = ('/mnt', '/media')
         for place in places:
             if os_path_isdir(place):
-                for directory in next(os.walk(place))[1]:
+                for directory in next(os.walk(place))[1]:           # pragma: no cover
                     PATH_PLACEHOLDERS[directory] = os_path_join(place, directory)
 
     elif os_platform in ('darwin', 'ios'):                          # pragma: no cover
@@ -361,12 +361,12 @@ def add_common_storage_paths():
             # noinspection PyUnresolvedReferences
             get_volume_information = windll.kernel32.GetVolumeInformationW
             for letter in string.ascii_uppercase:
-                drive = letter + ':' + os_path_sep
+                drive = letter + ':' + "\\"     # os.path.sep could be a slash under MS Win bash-emulation or under WSL
                 if bitmask & 1 and os_path_isdir(drive):
                     buf_len = 64
                     name = create_unicode_buffer(buf_len)
                     get_volume_information(drive, name, buf_len, None, None, None, None, 0)
-                    PATH_PLACEHOLDERS[name.value] = drive
+                    PATH_PLACEHOLDERS[name.value] = drive.replace("\\", "/")
                 bitmask >>= 1
         except (ModuleNotFoundError, ImportError):                  # pragma: no cover
             pass
@@ -647,9 +647,9 @@ def path_join(*parts: str) -> str:
     part_index = len(parts)     # simulate os.path.join() to ignore parts on the left of a root path part
     while part_index:
         part_index -= 1
-        if parts[part_index].startswith('/'):
+        if parts[part_index].startswith("/"):
             break
-    return '/'.join(_ for _ in parts[part_index:] if _).replace('//', '/')
+    return "/".join(_ for _ in parts[part_index:] if _).replace("//", "/")
 
 
 # noinspection GrazieInspection
@@ -745,7 +745,7 @@ def placeholder_path(path: str) -> str:
     """
     for key in sorted(PATH_PLACEHOLDERS, key=lambda k: len(PATH_PLACEHOLDERS[k]), reverse=True):
         val = PATH_PLACEHOLDERS[key]
-        if path == val or path.startswith(val + os_path_sep):
+        if path == val or path.replace("\\", "/").startswith(val + "/"):
             return '{' + key + '}' + path[len(val):]
     return path
 
@@ -804,7 +804,7 @@ def skip_py_cache_files(file_path: str) -> bool:
     :return:                True if the file specified in :paramref:`~skip_py_cache_files.file_path` has to be excluded,
                             else False.
     """
-    return PY_CACHE_FOLDER in file_path.split('/')
+    return PY_CACHE_FOLDER in file_path.split("/")
 
 
 def user_data_path() -> str:
@@ -987,19 +987,21 @@ class Collector:                                                    # pylint: di
 
 
 class FilesRegister(dict):
-    """ file register catalog - see also :ref:`file register` examples. """
+    """ files register catalog - see also :ref:`files register` examples. """
     def __init__(self, *add_path_args,
                  property_matcher: Optional[Callable[[FileObject, ], bool]] = None,
                  file_sorter: Optional[Callable[[FileObject, ], Any]] = None,
                  **add_path_kwargs):
-        """ create a file register instance.
+        """ create a files register instance.
 
-        this method gets redirected with :paramref:`~FilesRegister.add_path_args` and
-        :paramref:`~FilesRegister.add_path_kwargs` arguments to :meth:`~FilesRegister.add_paths`.
-
-        :param add_path_args:   if passed, then :meth:`~FilesRegister.add_paths` will be called with this args tuple.
-        :param property_matcher: used as the default by :meth:`~FilesRegister.find_file` if not specified there.
-        :param file_sorter:     used as the default value by :meth:`~FilesRegister.find_file` if not specified there.
+        :param add_path_args:   if at least one argument get specified, then :meth:`~FilesRegister.add_paths` will be
+                                called with all the specified non-keyword-arguments and with the specified kwargs
+                                (apart from :paramref:`~FilesRegister.property_matcher`
+                                and :paramref:`~FilesRegister.file_sorter`).
+        :param property_matcher: file properties matcher callable, used as the default by
+                                :meth:`~FilesRegister.find_file` if not specified there.
+        :param file_sorter:     file sorter callable, used as the default value by
+                                :meth:`~FilesRegister.find_file` if not specified there.
         :param add_path_kwargs: passed onto call of :meth:`~FilesRegister.add_paths` if the
                                 :paramref:`~FilesRegister.add_path_args` got provided by the caller.
         """
@@ -1132,7 +1134,7 @@ class FilesRegister(dict):
         return file
 
     def reclassify(self, file_class: Type[FileObject] = CachedFile, **init_kwargs):
-        """ re-instantiate all name's file registers items to instances of the class :paramref:`~reclassify.file_class`.
+        """ reinstantiate all name's files registers items to instances of the class :paramref:`~reclassify.file_class`.
 
         :param file_class:      the new file object class (see :data:`~ae.files.FileObject`). each found file object
                                 will be passed to the class constructor (callable) and the return value will then
