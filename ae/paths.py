@@ -249,6 +249,8 @@ for more complex selections you can use callables passed into the :paramref:`~Fi
 and :paramref:`~FilesRegister.find_file.file_sorter` arguments of :meth:`~FilesRegister.find_file`.
 """
 # pylint: disable=too-many-lines
+from __future__ import annotations  # allow type forward references (PEP 563), can be removed in Python 3.14+ (PEP 749)
+
 import glob
 import os
 import re
@@ -257,9 +259,10 @@ import string
 import sys
 
 from collections import defaultdict
+from collections.abc import Callable, Iterable
 from functools import partial
 from pathlib import PurePath
-from typing import Any, Callable, Iterable, Optional, Type, Union
+from typing import Any
 
 from ae.base import (                                                                       # type: ignore
     PY_CACHE_FOLDER, env_str, format_given, norm_path,
@@ -269,7 +272,7 @@ from ae.system import app_name_guess, os_platform                               
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile                 # type: ignore
 
 
-__version__ = '0.3.45'
+__version__ = '0.3.46'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
@@ -284,19 +287,19 @@ INSERT_AT_BEGIN_OF_FILE_LIST = -APPEND_TO_END_OF_FILE_LIST
 
 COLLECTED_FOLDER = None                     #: item type value for a folder|directory|node
 
-CollArgType = Any
+
+type CollArgType = Any
 """ argument type passed to most callable arguments of :func:`coll_items` except of :paramref:`~coll_items.searcher` """
-CollCreatorReturnType = Any
+type CollCreatorReturnType = Any
 """ type of the return value of the :paramref:`~coll_items.creator` callable, which will be returned to the caller """
-CollYieldType = Optional[str]
+type CollYieldType = str | None
 """ type of collected item, which is either :data:`COLLECTED_FOLDER` for a folder or the file extension for a file """
-CollYieldItems = Iterable[tuple[CollYieldType, CollArgType]]
+type CollYieldItems = Iterable[tuple[CollYieldType, CollArgType]]
 """ type of collected item iterator yielding tuples of (CollYieldType, item[_path]) """
 
-SearcherRetType = Iterable[CollArgType]
+type SearcherRetType = Iterable[CollArgType]
 """ type of the return value of the callable :paramref:`~coll_items.searcher` argument of :func:`coll_items` """
-
-SearcherType = Callable[[str], SearcherRetType]
+type SearcherType = Callable[[str], SearcherRetType]
 """ type of the callable :paramref:`~coll_items.searcher` argument of :func:`coll_items` """
 
 
@@ -394,13 +397,13 @@ def app_docs_path() -> str:
     return os_path_join(user_docs_path(), PATH_PLACEHOLDERS.get('main_app_name', PATH_PLACEHOLDERS['app_name']))
 
 
-def coll_files(file_mask: str, file_class: Union[Type[Any], Callable] = str, **file_kwargs) -> CollYieldItems:
+def coll_files(file_mask: str, file_class: type[Any] | Callable = str, **file_kwargs) -> CollYieldItems:
     """ determine existing file(s) underneath the folder specified by :paramref:`~coll_files.file_mask`.
 
     :param file_mask:           glob file mask (with optional glob wildcards and :data:`PATH_PLACEHOLDERS`)
                                 specifying the files to collect (by default including the subfolders).
     :param file_class:          factory used for the returned list items (see :paramref:`coll_items.creator`).
-                                silly mypy does not support Union[Type[Any], Callable[[str, KwArg()], Any]].
+                                silly mypy does not support (type[Any] | Callable[[str, KwArg()], Any]).
     :param file_kwargs:         additional/optional kwargs apart from the file name passed onto the used item_class.
     :return:                    iterator/generator yielding a 2-item-tuple for each found/matching file.
                                 the first tuple-item is the file extension, and the second tuple-item is an instance
@@ -409,13 +412,13 @@ def coll_files(file_mask: str, file_class: Union[Type[Any], Callable] = str, **f
     yield from coll_items(file_mask, selector=os_path_isfile, creator=file_class, **file_kwargs)
 
 
-def coll_folders(folder_mask: str, folder_class: Union[Type[Any], Callable] = str, **folder_kwargs) -> CollYieldItems:
+def coll_folders(folder_mask: str, folder_class: type[Any] | Callable = str, **folder_kwargs) -> CollYieldItems:
     """ determine existing folder(s) underneath the folder specified by :paramref:`~coll_folders.folder_mask`.
 
     :param folder_mask:         glob folder mask (with optional glob wildcards and :data:`PATH_PLACEHOLDERS`)
                                 specifying the folders to collect (by default including the subfolders).
     :param folder_class:        class or factory used for the returned list items (see :paramref:`coll_items.creator`).
-                                silly mypy does not support Union[Type[Any], Callable[[str, KwArg()], Any]].
+                                silly mypy does not support (type[Any] | Callable[[str, KwArg()], Any]).
     :param folder_kwargs:       additional/optional kwargs apart from the file name passed onto the used item_class.
     :return:                    iterator/generator yielding a 2-item-tuple for each found/matching folder/directory.
                                 the first tuple-item is :data:`COLLECTED_FOLDER` (as long as
@@ -437,7 +440,7 @@ def coll_item_type(item_path: str) -> CollYieldType:
 
 def coll_items(item_mask: str,
                searcher: SearcherType = partial(glob.glob, recursive=True),
-               selector: Callable[[CollArgType], Union[bool, Any]] = str,
+               selector: Callable[[CollArgType], bool | Any] = str,
                type_detector: Callable[[CollArgType], CollYieldType] = coll_item_type,
                creator: Callable[[CollArgType], CollCreatorReturnType] = str,  # mypy lacks **creator_kwargs in Callable
                **creator_kwargs
@@ -463,7 +466,7 @@ def coll_items(item_mask: str,
                                 alternatively, you can pass a callable which will be called on each found file/folder.
                                 in this case the return value of the callable will be inserted in the related
                                 item of the returned list.
-                                silly mypy does not support ``Union[Type[Any], Callable[[str, KwArg()], Any]]``.
+                                silly mypy does not support ``type[Any] | Callable[[str, KwArg()], Any]``.
     :param creator_kwargs:      additional/optional kwargs passed onto the used item_class apart from the item name.
     :return:                    iterator/generator yielding a 2-item-tuple for each found/matching file system item.
                                 the first tuple-item is the file/folder type returned by the specified
@@ -570,26 +573,26 @@ def normalize(path: str, make_absolute: bool = True, remove_base_path: str = "",
                      )
 
 
-def path_files(file_mask: str, file_class: Union[Type[Any], Callable] = str, **file_kwargs) -> list[Any]:
+def path_files(file_mask: str, file_class: type[Any] | Callable = str, **file_kwargs) -> list[Any]:
     """ determine existing file(s) underneath the folder specified by :paramref:`~path_files.file_mask`.
 
     :param file_mask:           glob file mask (with optional glob wildcards and :data:`PATH_PLACEHOLDERS`)
                                 specifying the files to collect (by default including the subfolders).
     :param file_class:          factory used for the returned list items (see :paramref:`path_items.creator`).
-                                silly mypy does not support Union[Type[Any], Callable[[str, KwArg()], Any]].
+                                silly mypy does not support (type[Any] | Callable[[str, KwArg()], Any]).
     :param file_kwargs:         additional/optional kwargs apart from the file name passed onto the used item_class.
     :return:                    list of files of the class specified by :paramref:`~path_files.file_mask`.
     """
     return path_items(file_mask, selector=os_path_isfile, creator=file_class, **file_kwargs)
 
 
-def path_folders(folder_mask: str, folder_class: Union[Type[Any], Callable] = str, **folder_kwargs) -> list[Any]:
+def path_folders(folder_mask: str, folder_class: type[Any] | Callable = str, **folder_kwargs) -> list[Any]:
     """ determine existing folder(s) underneath the folder specified by :paramref:`~path_folders.folder_mask`.
 
     :param folder_mask:         glob folder mask (with optional glob wildcards and :data:`PATH_PLACEHOLDERS`)
                                 specifying the folders to collect (by default including the subfolders).
     :param folder_class:        class or factory used for the returned list items (see :paramref:`path_items.creator`).
-                                silly mypy does not support Union[Type[Any], Callable[[str, KwArg()], Any]].
+                                silly mypy does not support (type[Any] | Callable[[str, KwArg()], Any]).
     :param folder_kwargs:       additional/optional kwargs apart from the file name passed onto the used item_class.
     :return:                    list of folders of the class specified by :paramref:`~path_folders.folder_mask`.
     """
@@ -597,7 +600,7 @@ def path_folders(folder_mask: str, folder_class: Union[Type[Any], Callable] = st
 
 
 def path_items(item_mask: str, selector: Callable[[str], Any] = str,
-               creator: Union[Type[Any], Callable] = str, **creator_kwargs) -> list[Any]:
+               creator: type[Any] | Callable = str, **creator_kwargs) -> list[Any]:
     """ determine existing file/folder item(s) underneath the folder specified by :paramref:`~path_items.item_mask`.
 
     :param item_mask:           file path mask (with optional glob wildcards and :data:`PATH_PLACEHOLDERS`)
@@ -613,7 +616,7 @@ def path_items(item_mask: str, selector: Callable[[str], Any] = str,
                                 alternatively, you can pass a callable which will be called on each found file/folder.
                                 in this case the return value of the callable will be inserted in the related
                                 item of the returned list.
-                                silly mypy does not support Union[Type[Any], Callable[[str, KwArg()], Any]].
+                                silly mypy does not support (type[Any] | Callable[[str, KwArg()], Any]).
     :param creator_kwargs:      additional/optional kwargs passed onto the used item_class apart from the item name.
     :return:                    list of found and selected items of the item class (:paramref:`~path_items.item_mask`).
     """
@@ -934,8 +937,8 @@ class Collector:                                                    # pylint: di
                 self.suffix_failed[suffix] += 1
 
     def collect(self, *prefixes: str,
-                append: Union[str, tuple[str, ...]] = (),
-                select: Union[str, tuple[str, ...]] = ()) -> "Collector":
+                append: str | tuple[str, ...] = (),
+                select: str | tuple[str, ...] = ()) -> Collector:
         """ collect additional files/folders by combining the given prefixes with all the given append/select suffixes.
 
         .. note:: all arguments of this method can either be passed either as tuples or for a single value as string.
@@ -989,8 +992,8 @@ class Collector:                                                    # pylint: di
 class FilesRegister(dict):
     """ files register catalog - see also :ref:`files register` examples. """
     def __init__(self, *add_path_args,
-                 property_matcher: Optional[Callable[[FileObject, ], bool]] = None,
-                 file_sorter: Optional[Callable[[FileObject, ], Any]] = None,
+                 property_matcher: Callable[[FileObject, ], bool] | None = None,
+                 file_sorter: Callable[[FileObject, ], Any] | None = None,
                  **add_path_kwargs):
         """ create a files register instance.
 
@@ -1011,7 +1014,7 @@ class FilesRegister(dict):
         if add_path_args:
             self.add_paths(*add_path_args, **add_path_kwargs)
 
-    def __call__(self, *find_args, **find_kwargs) -> Optional[FileObject]:
+    def __call__(self, *find_args, **find_kwargs) -> FileObject | None:
         """ add_path_args and kwargs will be completely redirected to :meth:`~FilesRegister.find_file`. """
         return self.find_file(*find_args, **find_kwargs)
 
@@ -1056,7 +1059,7 @@ class FilesRegister(dict):
         return added_file_paths
 
     def add_paths(self, *file_path_masks: str, first_index: int = APPEND_TO_END_OF_FILE_LIST,
-                  file_class: Type[FileObject] = RegisteredFile, **init_kwargs) -> list[str]:
+                  file_class: type[FileObject] = RegisteredFile, **init_kwargs) -> list[str]:
         """ add files found in the folder(s) specified by the :paramref:`~add_paths.file_path_masks` args.
 
         :param file_path_masks: file path masks (with optional wildcards and :data:`~ae.paths.PATH_PLACEHOLDERS`)
@@ -1082,7 +1085,7 @@ class FilesRegister(dict):
                 self.add_files(path_files(mask, file_class=file_class, **init_kwargs), first_index=first_index))
         return added_file_paths
 
-    def add_register(self, files_register: 'FilesRegister', first_index: int = APPEND_TO_END_OF_FILE_LIST) -> list[str]:
+    def add_register(self, files_register: FilesRegister, first_index: int = APPEND_TO_END_OF_FILE_LIST) -> list[str]:
         """ add files from another :class:`FilesRegister` instance.
 
         :param files_register:  the :class:`FilesRegister` instance containing the file_obj to be added.
@@ -1100,10 +1103,10 @@ class FilesRegister(dict):
             added_file_paths.extend(self.add_files(files, first_index=first_index))
         return added_file_paths
 
-    def find_file(self, name: str, properties: Optional[PropertiesType] = None,
-                  property_matcher: Optional[Callable[[FileObject, ], bool]] = None,
-                  file_sorter: Optional[Callable[[FileObject, ], Any]] = None,
-                  ) -> Optional[FileObject]:
+    def find_file(self, name: str, properties: PropertiesType | None = None,
+                  property_matcher: Callable[[FileObject, ], bool] | None = None,
+                  file_sorter: Callable[[FileObject, ], Any] | None = None,
+                  ) -> FileObject | None:
         """ find file_obj in this register via properties, property matcher callables and/or file sorter.
 
         :param name:            file name (stem without extension) to find.
@@ -1133,7 +1136,7 @@ class FilesRegister(dict):
             file = files[0]
         return file
 
-    def reclassify(self, file_class: Type[FileObject] = CachedFile, **init_kwargs):
+    def reclassify(self, file_class: type[FileObject] = CachedFile, **init_kwargs):
         """ reinstantiate all name's files registers items to instances of the class :paramref:`~reclassify.file_class`.
 
         :param file_class:      the new file object class (see :data:`~ae.files.FileObject`). each found file object
