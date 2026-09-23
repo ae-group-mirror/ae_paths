@@ -1,15 +1,14 @@
-# THIS FILE IS EXCLUSIVELY MAINTAINED by the project aedev.project_tpls v0.3.79
-""" setup of ae namespace module portion paths: generic file path helpers. """
-import sys
-# noinspection PyUnresolvedReferences
+# THIS FILE IS EXCLUSIVELY MAINTAINED by the project aedev.project_tpls v0.3.103
+""" setup of ae namespace module portion paths: file system path helpers. """
 import pathlib
-# noinspection PyUnresolvedReferences
+import sys
+from typing import Any
 import setuptools
 
 
 print("SetUp " + __name__ + ": " + sys.executable + str(sys.argv) + f" {sys.path=}")
 
-setup_kwargs = {
+setup_kwargs: dict[str, Any] = {
     'author': 'AndiEcker',
     'author_email': 'aecker2@gmail.com',
     'classifiers': [
@@ -22,7 +21,7 @@ setup_kwargs = {
         'Topic :: Software Development :: Libraries :: Python Modules',
         'Typing :: Typed',
     ],
-    'description': 'ae namespace module portion paths: generic file path helpers',
+    'description': 'ae namespace module portion paths: file system path helpers',
     'extras_require': {
         'dev': [
             'aedev_project_tpls',
@@ -77,10 +76,10 @@ setup_kwargs = {
     },
     'python_requires': '>=3.12',
     'url': 'https://gitlab.com/ae-group/ae_paths',
-    'version': '0.3.46',
+    'version': '0.3.47',
     'zip_safe': True,
 }
 
 if __name__ == "__main__":
     setuptools.setup(**setup_kwargs)
-    pass
+    ...

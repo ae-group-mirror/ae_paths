@@ -4,7 +4,10 @@ import os
 import pathlib
 import pytest
 import shutil
-from unittest.mock import patch
+import sys
+import types
+from ctypes import create_unicode_buffer
+from unittest.mock import patch, MagicMock
 
 from ae.base import (CFG_EXT, INI_EXT, PY_CACHE_FOLDER, TESTS_FOLDER,
                      format_given, write_file)
@@ -21,7 +24,7 @@ from ae.paths import (PATH_PLACEHOLDERS,
 try:
     import plyer
     plyer_is_importable = True
-except (ModuleNotFoundError, ImportError):                          # pragma: no cover
+except (ModuleNotFoundError, ImportError):
     plyer_is_importable = False
 
 
@@ -70,7 +73,7 @@ def property_matcher_mock(file):
 
 def file_loader_mock_func(file):
     """ cacheables file object loader mock function """
-    return file     # pragma: no cover
+    return file
 
 
 def file_sorter_mock(file):
@@ -125,6 +128,14 @@ class TestHelpers:
         assert path_match('abc.py', "ab[cxy].py")
         assert path_match('abc.py', "ab[!dxy].py")
 
+    def test_path_match_py313(self):
+        with (patch('ae.paths.sys.version_info', (3, 13)),
+              patch('ae.paths.PurePath') as mock_full_match):
+            assert path_match('c.py', "?.py")
+
+        mock_full_match.assert_called_once_with('c.py')
+        mock_full_match.return_value.full_match.assert_called_once_with('?.py')
+
     def test_path_name(self):
         assert path_name("") == ""
         assert path_name("/not/a/existing/test/path") == ""
@@ -134,7 +145,7 @@ class TestHelpers:
         duplicates2 = ('doc', 'documents')
         for name, path in PATH_PLACEHOLDERS.items():
             if path_name(path) == 'external_storage':
-                assert name == 'external_storage' or path.endswith(name)    # pragma: no cover
+                assert name == 'external_storage' or path.endswith(name)
             else:
                 names = duplicates1 if name in duplicates1 else duplicates2 if name in duplicates2 else (name,)
                 assert path_name(path) in names
@@ -180,11 +191,142 @@ class TestHelpers:
         assert skip_py_cache_files(f"a/c/c/{PY_CACHE_FOLDER}/x.py")
 
 
-class TestPlaceholders:
+class TestAddCommonStoragePaths:
+    @pytest.fixture(autouse=True)
+    def reset_paths(self):
+        """ restore module-load/initial PATH_PLACEHOLDERS """
+        paths = PATH_PLACEHOLDERS.copy()
+        yield
+        PATH_PLACEHOLDERS.clear()
+        PATH_PLACEHOLDERS.update(paths)
+
+    def test_add_common_storage_paths_plyer(self):
+        storagepath = types.SimpleNamespace(
+            get_application_dir=lambda: '/application',
+            get_documents_dir=lambda: '/documents',
+            get_downloads_dir=lambda: '/downloads',
+            get_external_storage_dir=lambda: '/external',
+            get_home_dir=lambda: '/home',
+            get_music_dir=lambda: '/music',
+            get_pictures_dir=lambda: '/pictures',
+            get_root_dir=lambda: '/root',
+            get_videos_dir=lambda: '/videos',
+            get_sdcard_dir=lambda: None,
+            get_invalid_dir=lambda: 123,
+        )
+        mock_plyer = types.ModuleType('plyer')
+        mock_plyer.storagepath = storagepath
+
+        with (patch.dict(sys.modules, {'plyer': mock_plyer}),
+              patch('ae.paths.os_platform', 'other')):
+            add_common_storage_paths()
+
+        assert PATH_PLACEHOLDERS['application'] == '/application'
+        assert PATH_PLACEHOLDERS['documents'] == '/documents'
+        assert PATH_PLACEHOLDERS['downloads'] == '/downloads'
+        assert PATH_PLACEHOLDERS['external_storage'] == '/external'
+        assert PATH_PLACEHOLDERS['home'] == '/home'
+        assert PATH_PLACEHOLDERS['music'] == '/music'
+        assert PATH_PLACEHOLDERS['pictures'] == '/pictures'
+        assert PATH_PLACEHOLDERS['root'] == '/root'
+        assert PATH_PLACEHOLDERS['videos'] == '/videos'
+        assert 'sdcard' not in PATH_PLACEHOLDERS
+        assert 'invalid' not in PATH_PLACEHOLDERS
+
+    def test_add_common_storage_paths_without_plyer(self):
+        with (patch.dict(sys.modules, {'plyer': None}),
+              patch('ae.paths.os_platform', 'other')):
+            add_common_storage_paths()
+
+    def test_add_common_storage_paths_plyer_getter_exception(self):
+        storage_path = types.SimpleNamespace(
+            get_good_dir=lambda: '/good',
+            get_bad_dir=lambda: (_ for _ in ()).throw(RuntimeError()),
+        )
+        mock_plyer = types.ModuleType('plyer')
+        mock_plyer.storagepath = storage_path
+
+        with (patch.dict(sys.modules, {'plyer': mock_plyer}),
+              patch('ae.paths.os_platform', 'other')):
+            add_common_storage_paths()
+
+        assert PATH_PLACEHOLDERS['good'] == '/good'
+        assert 'bad' not in PATH_PLACEHOLDERS
+
+    def test_add_common_storage_paths_linux(self):
+        with (patch('ae.paths.os_platform', 'linux'),
+              patch('ae.paths.os_path_isdir', return_value=True),
+              patch('ae.paths.os.walk', return_value=iter([
+                  ('/mnt', ['drive1', 'drive2'], []), 
+                  ('/media', ['drive3'], []),
+              ]))):
+            add_common_storage_paths()
+
+        assert PATH_PLACEHOLDERS['drive1'] == '/mnt/drive1'
+        assert PATH_PLACEHOLDERS['drive2'] == '/mnt/drive2'
+        assert PATH_PLACEHOLDERS['drive3'] == '/media/drive3'
+
+    def test_add_common_storage_paths_linux_without_directory(self):
+        with (patch('ae.paths.os_platform', 'linux'),
+              patch('ae.paths.os_path_isdir', return_value=False)):
+            add_common_storage_paths()
+
+    def test_add_common_storage_paths_apple(self):
+        with (patch('ae.paths.os_platform', 'darwin'),
+              patch('ae.paths.os_path_isdir', return_value=True),
+              patch('ae.paths.os.walk', return_value=iter([('/Volume', ['disk1', 'disk2'], [])]))):
+            add_common_storage_paths()
+
+        assert PATH_PLACEHOLDERS['disk1'] == '/Volume/disk1'
+        assert PATH_PLACEHOLDERS['disk2'] == '/Volume/disk2'
+
+    def test_add_common_storage_paths_ios_without_volume(self):
+        with (patch('ae.paths.os_platform', 'ios'),
+              patch('ae.paths.os_path_isdir', return_value=False)):
+            add_common_storage_paths()
+
+    def test_add_common_storage_paths_windows(self):
+        kernel32 = MagicMock()
+        kernel32.GetLogicalDrives.return_value = 1
+        kernel32.GetVolumeInformationW.side_effect = (lambda drive, name, *_args: setattr(name, 'value', 'TestDrive'))
+
+        windll = MagicMock(kernel32=kernel32)
+        ctypes = types.ModuleType('ctypes')
+        ctypes.windll = windll
+        ctypes.create_unicode_buffer = create_unicode_buffer
+
+        with (patch('ae.paths.os_platform', 'win32'),
+              patch.dict(sys.modules, {'ctypes': ctypes}),
+              patch('ae.paths.os_path_isdir', return_value=True)):
+            add_common_storage_paths()
+
+        assert PATH_PLACEHOLDERS['TestDrive'] == 'A:/'
+
+    def test_add_common_storage_paths_cygwin(self):
+        with (patch('ae.paths.os_platform', 'cygwin'),
+              patch.dict(sys.modules, {'ctypes': None})):
+            add_common_storage_paths()
+
+    def test_add_common_storage_paths_windows_without_drive(self):
+        kernel32 = MagicMock()
+        kernel32.GetLogicalDrives.return_value = 1
+
+        windll = MagicMock(kernel32=kernel32)
+        ctypes = types.ModuleType('ctypes')
+        ctypes.windll = windll
+        ctypes.create_unicode_buffer = create_unicode_buffer
+
+        with (patch('ae.paths.os_platform', 'win32'),
+              patch.dict(sys.modules, {'ctypes': ctypes}),
+              patch('ae.paths.os_path_isdir', return_value=False)):
+            add_common_storage_paths()
+
+
+class TestPathPlaceholdersGlobal:
     def test_add_common_storage_paths(self):
         paths_count = len(PATH_PLACEHOLDERS)
         add_common_storage_paths()
-        assert len(PATH_PLACEHOLDERS) >= paths_count                # 6 == 6
+        assert len(PATH_PLACEHOLDERS) >= paths_count                # 6 >= 6
         if 'CI_PROJECT_ID' not in os.environ:                       # skip on GitLab CI
             assert len(PATH_PLACEHOLDERS) > paths_count
             if plyer_is_importable:
@@ -198,7 +340,7 @@ class TestPlaceholders:
                 assert 'root' in PATH_PLACEHOLDERS
                 assert 'videos' in PATH_PLACEHOLDERS
         if os_platform == 'android':
-            assert 'sdcard' in PATH_PLACEHOLDERS                    # pragma: no cover
+            assert 'sdcard' in PATH_PLACEHOLDERS
 
     def test_normalize(self):
         f_path = "norm_file.tst"
@@ -222,8 +364,8 @@ class TestPlaceholders:
         assert normalize(f_path) == os.path.realpath(f_path)
         assert normalize(f_path, remove_base_path=TESTS_FOLDER) == "norm_test.tst"
         assert normalize(f_path, remove_base_path=TESTS_FOLDER) == os.path.relpath(f_path, TESTS_FOLDER)
-        assert normalize(f_path, remove_base_path='_not_existing_') == f"../{TESTS_FOLDER}/" \
-                                                                       f"{os.path.relpath(f_path, TESTS_FOLDER)}"
+        assert normalize(f_path, remove_base_path='_not_existing_') == (
+            f"../{TESTS_FOLDER}/{os.path.relpath(f_path, TESTS_FOLDER)}")
         assert f"../{TESTS_FOLDER}/{normalize(f_path, remove_base_path=TESTS_FOLDER)}" == os.path.relpath(
             f_path, "_not_exists_folder")
 
@@ -293,12 +435,30 @@ class TestAppPaths:
 
 
 class TestUserDataPath:
-    @pytest.mark.skipif("os_platform != 'android'", reason="android-only test")
-    def test_user_data_path_android(self):      # pragma: no cover
-        with patch('ae.paths.os_platform', 'android'), patch.dict('os.environ', dict(ANDROID_ARGUMENT='any_value')):
-            assert user_data_path()
-        with patch('ae.paths.os_platform', 'android'), patch.dict('os.environ', dict(KIVY_BUILD='any_value')):
-            assert user_data_path()
+    @pytest.mark.parametrize("platform", ('linux', 'freebsd', 'any_other_os'))
+    def test_user_data_path_all_linux(self, platform):
+        tst_dir = "/.config"
+
+        with patch('ae.paths.os_platform', platform):
+            assert user_data_path().endswith(tst_dir)
+
+        with patch('ae.paths.os_platform', platform), patch.dict('os.environ', dict(XDG_CONFIG_HOME="")):
+            assert user_data_path().endswith(tst_dir)
+
+        with patch('ae.paths.os_platform', platform), patch.dict('os.environ', dict(XDG_CONFIG_HOME=tst_dir)):
+            assert user_data_path().endswith(tst_dir)
+
+    def test_user_data_path_android(self):
+        mock_jnius = MagicMock()
+        mock_cls = mock_jnius.cast.return_value
+        mock_cls.getAbsolutePath.return_value = '/android/tst/data/dir'
+
+        with (patch('ae.paths.os_platform', 'android'),
+              patch('ae.paths.importlib.import_module', return_value=mock_jnius) as imp_mock):
+            assert user_data_path() == '/android/tst/data/dir'
+
+        imp_mock.assert_called_once_with('jnius')
+        mock_jnius.autoclass.assert_called_once_with('org.kivy.android.PythonActivity')
 
     def test_user_data_path_cygwin(self):
         test_root = "/test_path"
@@ -313,16 +473,12 @@ class TestUserDataPath:
         with patch('ae.paths.os_platform', 'ios'):
             assert user_data_path() == os.path.expanduser(os.path.join("~", "Documents"))
 
-    def test_user_data_path_linux(self):  # or _freebsd or any other os
-        test_path = ".config"
-        with patch('ae.paths.os_platform', 'linux'), patch.dict('os.environ', dict(XDG_CONFIG_HOME=test_path)):
-            assert user_data_path().endswith(test_path)
-        with patch('ae.paths.os_platform', 'linux'), patch.dict('os.environ', dict(XDG_CONFIG_HOME="")):
-            assert user_data_path().endswith(test_path)
-        with patch('ae.paths.os_platform', 'freebsd'), patch.dict('os.environ', dict(XDG_CONFIG_HOME=test_path)):
-            assert user_data_path().endswith(test_path)
-        with patch('ae.paths.os_platform', 'freebsd'), patch.dict('os.environ', dict(XDG_CONFIG_HOME="")):
-            assert user_data_path().endswith(test_path)
+    # @pytest.mark.skipif("os_platform != 'android'", reason="android-only test")
+    # def test_user_data_path_running_android(self):
+    #     with patch.dict('os.environ', dict(ANDROID_ARGUMENT='any_value')):
+    #         assert user_data_path()
+    #     with patch.dict('os.environ', dict(KIVY_BUILD='any_value')):
+    #         assert user_data_path()
 
     def test_user_data_path_win32(self):
         test_root = "/test_path"
@@ -331,15 +487,27 @@ class TestUserDataPath:
 
 
 class TestUserDocsPath:
-    @pytest.mark.skipif("os_platform != 'android'", reason="android-only test")
-    def test_user_docs_path_android(self):      # pragma: no cover
-        with patch('ae.paths.os_platform', 'android'), patch.dict('os.environ', dict(ANDROID_ARGUMENT='any_value')):
-            assert user_docs_path()
-        with patch('ae.paths.os_platform', 'android'), patch.dict('os.environ', dict(KIVY_BUILD='any_value')):
-            assert user_docs_path()
+    @pytest.mark.parametrize("platform", ('darwin', 'ios', 'linux', 'freebsd', 'any_other_os'))
+    def test_user_docs_path_all_posix(self, platform):
+        with patch('ae.paths.os_platform', platform):
+            assert user_docs_path() == os.path.expanduser(os.path.join("~", "Documents"))
+
+    def test_user_docs_path_android(self):
+        mock_jnius = MagicMock()
+        mock_cls = mock_jnius.autoclass.return_value
+        mock_cls.DIRECTORY_DOCUMENTS = 'DocumentsDir'
+        mock_cls.getExternalStoragePublicDirectory.return_value.getAbsolutePath.return_value = '/android/tst/docs/dir'
+
+        with (patch('ae.paths.os_platform', 'android'),
+              patch('ae.paths.importlib.import_module', return_value=mock_jnius) as imp_mock):
+            assert user_docs_path() == '/android/tst/docs/dir'
+
+        imp_mock.assert_called_once_with('jnius')
+        mock_jnius.autoclass.assert_called_once_with('android.os.Environment')
+        mock_cls.getExternalStoragePublicDirectory.assert_called_once_with('DocumentsDir')
 
     def test_user_docs_path_cygwin(self):
-        test_root = "/test_path"
+        test_root = "/tst_usr_root"
         with patch('ae.paths.os_platform', 'cygwin'), patch.dict('os.environ', dict(USERPROFILE=test_root)):
             assert user_docs_path() == test_root + "/Documents"
 
@@ -351,15 +519,15 @@ class TestUserDocsPath:
         with patch('ae.paths.os_platform', 'ios'):
             assert user_docs_path() == os.path.expanduser(os.path.join("~", "Documents"))
 
-    def test_user_docs_path_linux(self):  # or _freebsd or any other os
-        test_path = "Documents"
-        with patch('ae.paths.os_platform', 'linux'):
-            assert user_docs_path().endswith(test_path)
-        with patch('ae.paths.os_platform', 'freebsd'):
-            assert user_docs_path().endswith(test_path)
+    # @pytest.mark.skipif("os_platform != 'android'", reason="android-only test")
+    # def test_user_docs_path_running_on_android(self):
+    #     with patch.dict('os.environ', dict(ANDROID_ARGUMENT='any_value')):
+    #         assert user_docs_path()
+    #     with patch.dict('os.environ', dict(KIVY_BUILD='any_value')):
+    #         assert user_docs_path()
 
     def test_user_docs_path_win32(self):
-        test_root = "/test_path"
+        test_root = "/test_usr_path"
         with patch('ae.paths.os_platform', 'win32'), patch.dict('os.environ', dict(USERPROFILE=test_root)):
             assert user_docs_path() == test_root + "/Documents"
 
@@ -1195,7 +1363,7 @@ class TestCollector:
         assert sum(1 for _ in coll.paths if _ == os.path.join(os.getcwd(), 'ae')) == 1
         assert sum(1 for _ in coll.paths if _ == 'ae') == 2
 
-        assert 4 <= len(coll.files) <= 6    # .commit_msg.txt and .python-version are missing on CI host
+        assert 4 <= len(coll.files) <= 7    # .commit_msg.txt,d .python-version and .coverage are missing on CI host
         # ["{cwd}/.gitignore", "{cwd}/.commit_msg.txt", "{cwd}/.python-version", "{cwd}/.gitlab-ci.yml",
         #  "{cwd}/README.md", "{cwd}/tests/test_paths.py"]
         assert all(_.startswith(os.getcwd()) for _ in coll.files)
@@ -1210,11 +1378,11 @@ class TestCollector:
         assert coll.error_message
 
     def test_collect_select_failures(self):
-        coll = Collector(app="ae", tst="tests")
-        coll.collect("{cwd}", "{app}", "ae", select=".*")
+        coll = Collector(cw=os.getcwd(), app="ae", tst="tests")
+        coll.collect("{cw}", "{app}", "ae", select=".*")
         assert not coll.paths
-        assert 2 <= len(coll.files) <= 4
-        # ["{cwd}/.gitignore", "{cwd}/.commit_msg.txt", "{cwd}/.python-version", "{cwd}/.gitlab-ci.yml"]
+        assert 2 <= len(coll.files) <= 5
+        # ["{cw}/.gitignore", "{cw}/.commit_msg.txt", "{cw}/.python-version", "{cw}/.gitlab-ci.yml", "{cw}/.coverage"]
         assert all(_.startswith(os.getcwd()) for _ in coll.files)
         files = [os.path.basename(_) for _ in coll.files]
         assert '.gitignore' in files
@@ -1229,8 +1397,8 @@ class TestCollector:
         coll = Collector(app="ae", tst="tests")
         coll.collect("{cwd}", "{app}", "ae", select=".*")
         assert not coll.paths
-        assert 2 <= len(coll.files) <= 4
-        # ["{cwd}/.gitignore", "{cwd}/.gitlab-ci.yml"] only .commit_msg.txt|.python-version not existing on CI host
+        assert 2 <= len(coll.files) <= 5
+        # ["{cwd}/.gitignore", "{cwd}/.gitlab-ci.yml"] only .commit_msg.txt|.python-version|.coverage are not at CI host
         assert all(_.startswith(os.getcwd()) for _ in coll.files)
         files = [os.path.basename(_) for _ in coll.files]
         assert '.gitignore' in files
