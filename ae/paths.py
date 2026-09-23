@@ -1,21 +1,21 @@
 """
-generic file path helpers
-=========================
+file system path helpers
+========================
 
-this pure python namespace portion is providing useful :ref:`path helper functions` as well as
-:ref:`generic system paths` for most platforms, like e.g.:
+this pure-Python namespace portion provides useful :ref:`path helper functions` as well as
+:ref:`generic system paths` for the platforms/OSes:
 
-    * Android OS
+    * Android
     * iOS
     * Linux
-    * Mac OS X
-    * MS Windows
+    * macOS
+    * Windows
 
-the only external hard dependencies of this module are the ae namespace portions :mod:`ae.base` and :mod:`ae.files`.
+the only external hard dependencies of this module are the ``ae`` namespace portions :mod:`ae.base` and :mod:`ae.files`.
 optional dependencies are:
 
-    * on android OS the PyPi package `jnius`, needed by the functions :func:`user_data_path` and :func:`user_docs_path`.
-    * the `plyer` PyPi package, needed by the function :func:`add_common_storage_paths`.
+    * on Android the PyPi package ``jnius``, required by :func:`user_data_path` and :func:`user_docs_path`.
+    * the ``plyer`` PyPi package, required by :func:`add_common_storage_paths`.
 
 
 path helper functions
@@ -252,6 +252,7 @@ and :paramref:`~FilesRegister.find_file.file_sorter` arguments of :meth:`~FilesR
 from __future__ import annotations  # allow type forward references (PEP 563), can be removed in Python 3.14+ (PEP 749)
 
 import glob
+import importlib
 import os
 import re
 import shutil
@@ -272,7 +273,7 @@ from ae.system import app_name_guess, os_platform                               
 from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile                 # type: ignore
 
 
-__version__ = '0.3.46'
+__version__ = '0.3.47'
 
 
 APPEND_TO_END_OF_FILE_LIST = sys.maxsize
@@ -326,10 +327,9 @@ def add_common_storage_paths():
     * `Linux`: external storage devices/media mounted underneath the system partition root in /mnt or /media.
     * `Apple Mac OS X or iOS`: external storage devices/media mounted underneath the system partition root in /Volume.
     * `MS Windows`: additional drives mapped as the drive partition name.
-
     """
     try:
-        from plyer import storagepath                          # type: ignore  # pylint: disable=import-outside-toplevel
+        storagepath = importlib.import_module('plyer').storagepath  # from plyer import storagepath
 
         for attr in dir(storagepath):
             if attr.startswith('get_') and attr.endswith('_dir'):
@@ -339,39 +339,40 @@ def add_common_storage_paths():
                         PATH_PLACEHOLDERS[attr[4:-4]] = path
                 except (AttributeError, NotImplementedError, Exception):        # pylint: disable=broad-exception-caught
                     pass
-    except (ModuleNotFoundError, ImportError):                      # pragma: no cover
+    except (ModuleNotFoundError, ImportError):
         pass
 
     if os_platform == 'linux':
         places = ('/mnt', '/media')
         for place in places:
             if os_path_isdir(place):
-                for directory in next(os.walk(place))[1]:           # pragma: no cover
+                for directory in next(os.walk(place))[1]:
                     PATH_PLACEHOLDERS[directory] = os_path_join(place, directory)
 
-    elif os_platform in ('darwin', 'ios'):                          # pragma: no cover
-        vol = '/Volume'
-        if os_path_isdir(vol):
-            for drive in next(os.walk(vol))[1]:
-                PATH_PLACEHOLDERS[drive] = os_path_join(vol, drive)
+    elif os_platform in ('darwin', 'ios'):
+        places = '/Volume'
+        if os_path_isdir(places):
+            for place in next(os.walk(places))[1]:
+                PATH_PLACEHOLDERS[place] = os_path_join(places, place)
 
-    elif os_platform in ('win32', 'cygwin'):                        # pragma: no cover
+    elif os_platform in ('win32', 'cygwin'):
         try:
-            from ctypes import windll, create_unicode_buffer        # pylint: disable=import-outside-toplevel
+            ctypes = importlib.import_module('ctypes')  # from ctypes import windll, create_unicode_buffer
+            create_unicode_buffer, windll = ctypes.create_unicode_buffer, ctypes.windll
 
             # noinspection PyUnresolvedReferences
             bitmask = windll.kernel32.GetLogicalDrives()
             # noinspection PyUnresolvedReferences
             get_volume_information = windll.kernel32.GetVolumeInformationW
             for letter in string.ascii_uppercase:
-                drive = letter + ':' + "\\"     # os.path.sep could be a slash under MS Win bash-emulation or under WSL
-                if bitmask & 1 and os_path_isdir(drive):
+                place = letter + ':' + "\\"     # os.path.sep could be a slash under MS Win bash-emulation or under WSL
+                if bitmask & 1 and os_path_isdir(place):
                     buf_len = 64
                     name = create_unicode_buffer(buf_len)
-                    get_volume_information(drive, name, buf_len, None, None, None, None, 0)
-                    PATH_PLACEHOLDERS[name.value] = drive.replace("\\", "/")
+                    get_volume_information(place, name, buf_len, None, None, None, None, 0)
+                    PATH_PLACEHOLDERS[name.value] = place.replace("\\", "/")
                 bitmask >>= 1
-        except (ModuleNotFoundError, ImportError):                  # pragma: no cover
+        except (ModuleNotFoundError, ImportError):
             pass
 
 
@@ -692,7 +693,7 @@ def path_match(path: str, mask: str) -> bool:
         match = bool(re.fullmatch(re_mask, path))
     else:
         # noinspection PyUnresolvedReferences,PyUnusedLocal
-        match = PurePath(path).full_match(mask)                 # pragma: no cover # pylint: disable=no-member
+        match = PurePath(path).full_match(mask)                 # pylint: disable=no-member
     return match
 
 
@@ -819,16 +820,17 @@ def user_data_path() -> str:
 
     :return:    path string of the user data folder.
     """
-    if os_platform == 'android':            # pragma: no cover
-        from jnius import autoclass, cast   # type: ignore # pylint: disable=no-name-in-module, import-outside-toplevel
-        # noinspection PyPep8Naming
-        PythonActivity = autoclass('org.kivy.android.PythonActivity')   # pylint: disable=invalid-name
-        context = cast('android.content.Context', PythonActivity.mActivity)
-        file_p = cast('java.io.File', context.getFilesDir())
-        data_path = file_p.getAbsolutePath()
+    if os_platform == 'android':
+        jnius = importlib.import_module('jnius')
+        android_class = getattr(jnius, 'autoclass')
+        android_cast = getattr(jnius, 'cast')
+        python_activity = android_class('org.kivy.android.PythonActivity')
+        context = android_cast('android.content.Context', python_activity.mActivity)
+        files_path = android_cast('java.io.File', context.getFilesDir())
+        data_path = files_path.getAbsolutePath()
 
     elif os_platform in ('win32', 'cygwin'):
-        data_path = env_str('APPDATA') or "~"
+        data_path = env_str('APPDATA') or os_path_expanduser("~")
 
     else:
         if os_platform == 'ios':
@@ -851,32 +853,25 @@ def user_docs_path() -> str:
 
     :return:                    path string of the user documents folder.
     """
-    if os_platform == 'android':            # pragma: no cover
-        from jnius import autoclass         # pylint: disable=no-name-in-module, import-outside-toplevel
-        # noinspection PyPep8Naming
-        Environment = autoclass('android.os.Environment')  # pylint: disable=invalid-name
-        docs_path = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS).getAbsolutePath()
+    if os_platform == 'android':
+        android_env = importlib.import_module('jnius').autoclass('android.os.Environment')
+        return android_env.getExternalStoragePublicDirectory(android_env.DIRECTORY_DOCUMENTS).getAbsolutePath()
 
-    elif os_platform in ('win32', 'cygwin'):
-        docs_path = os_path_join(env_str('USERPROFILE') or "~", "Documents")
+    if os_platform in ('win32', 'cygwin'):
+        return os_path_join(env_str('USERPROFILE') or os_path_expanduser("~"), "Documents")
 
-    else:
-        docs_path = os_path_expanduser(os_path_join("~", "Documents"))
-
-    # noinspection PyTypeChecker
-    return docs_path
+    return os_path_expanduser(os_path_join("~", "Documents"))
 
 
-# noinspection PyDictCreation
-PATH_PLACEHOLDERS = {}   #: placeholders dict of user-, os- and app-specific system paths and file name parts
-
-PATH_PLACEHOLDERS['app_name'] = app_name_guess()    #: {app_name} path placeholder
-
-PATH_PLACEHOLDERS['ado'] = app_docs_path()          #: {ado} path placeholder
-PATH_PLACEHOLDERS['app'] = app_data_path()          #: {app} path placeholder
-PATH_PLACEHOLDERS['cwd'] = os.getcwd()              #: {cwd} path placeholder
-PATH_PLACEHOLDERS['doc'] = user_docs_path()         #: {doc} path placeholder
-PATH_PLACEHOLDERS['usr'] = user_data_path()         #: {usr} path placeholder
+PATH_PLACEHOLDERS = {'app_name': app_name_guess()}
+""" placeholders dict of path name parts and user-, os- and app-specific system paths """
+PATH_PLACEHOLDERS.update({  # separate update, because app_docs_path() requires PATH_PLACEHOLDERS['app_name']
+    'app_name': app_name_guess(),
+    'ado': app_docs_path(),
+    'app': app_data_path(),
+    'cwd': os.getcwd(),
+    'doc': user_docs_path(),
+    'usr': user_data_path()})
 
 
 class Collector:                                                    # pylint: disable=too-many-instance-attributes
