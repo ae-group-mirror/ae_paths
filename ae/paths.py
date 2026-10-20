@@ -280,7 +280,7 @@ from collections import defaultdict
 from collections.abc import Callable, Iterable
 from functools import partial
 from pathlib import PurePath
-from typing import Any, Protocol
+from typing import Any
 
 from ae.base import (                                                                       # type: ignore
     UNSET, UnsetType,
@@ -291,7 +291,7 @@ from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile     
 from ae.system import app_name_guess, os_platform                                           # type: ignore
 
 
-__version__ = '0.3.48'
+__version__ = '0.3.49'
 
 
 COLLECTED_FOLDER = UNSET                                            #: item type value for a folder|directory|node
@@ -312,7 +312,7 @@ SOUND_FOLDER = 'snd'                                                #: project r
 RESOURCES_NAMES = (IMAGE_FOLDER, I18N_FOLDER, SOUND_FOLDER)         #: resource types and default subfolder names
 
 
-type CollArgType = Any
+type CollArgType = str | os.PathLike[str]
 """ argument type passed to most callable arguments of :func:`coll_items` except of :paramref:`~coll_items.searcher` """
 type CollCreatorReturnType = Any
 """ type of the return value of the :paramref:`~coll_items.creator` callable, which will be returned to the caller """
@@ -320,16 +320,14 @@ type CollYieldType = str | UnsetType | None
 """ collected item type: :data:`COLLECTED_FOLDER` for a folder, a file extension for a file, or `None` if not found """
 type CollYieldItems = Iterable[tuple[CollYieldType, CollArgType]]
 """ type of collected item iterator yielding tuples of (CollYieldType, item[_path]) """
+type CollCreatorFuncType = Callable[..., CollCreatorReturnType]
+""" type of collection item creator callable allowing one :data:`CollArgType` argument and optional multiple kwargs
+(:paramref:`coll_items.creator` and :paramref:`path_items.creator`) """
 
 type SearcherRetType = Iterable[CollArgType]
 """ type of the return value of the callable :paramref:`~coll_items.searcher` argument of :func:`coll_items` """
 type SearcherType = Callable[[str], SearcherRetType]
 """ type of the callable :paramref:`~coll_items.searcher` argument of :func:`coll_items` """
-
-
-class CollCreatorFuncType(Protocol):                                # pylint: disable=too-few-public-methods
-    """ type of collection item creator callable (:paramref:`coll_items.creator` and :paramref:`path_items.creator`) """
-    def __call__(self, arg: CollArgType, **kwargs: Any) -> CollCreatorReturnType: ...
 
 
 def add_common_storage_paths():
@@ -459,14 +457,16 @@ def coll_folders(folder_mask: str, folder_class: type[Any] | Callable = str, **f
     yield from coll_items(folder_mask, selector=os_path_isdir, creator=folder_class, **folder_kwargs)
 
 
-def coll_item_type(item_path: str) -> CollYieldType:
+def coll_item_type(item_path: CollArgType) -> CollYieldType:
     """ classify path item to be either file, folder or non-existent/excluded/skipped.
 
     :param item_path:           file/folder path string.
-    :return:                    COLLECTED_FOLDER for folders, the file extension for files, or `None` if not found.
+    :return:                    COLLECTED_FOLDER for folders, the file extension for files (including the leading dot)
+                                or `None` if not found.
     """
     return (COLLECTED_FOLDER if os_path_isdir(item_path) else
-            os_path_splitext(item_path)[1] if os_path_isfile(item_path) else
+            # PyCharm-Type-Checker warnings with: os_path_splitext(item_path)[1] if os_path_isfile(item_path) else
+            PurePath(item_path).suffix if os_path_isfile(item_path) else
             None)
 
 
@@ -630,8 +630,8 @@ def path_folders(folder_mask: str, folder_class: type[Any] | Callable = str, **f
     return path_items(folder_mask, selector=os_path_isdir, creator=folder_class, **folder_kwargs)
 
 
-def path_items(item_mask: str, selector: Callable[[str], Any] = str,
-               creator: type[Any] | CollCreatorFuncType = str, **creator_kwargs) -> list[Any]:
+def path_items(item_mask: str, selector: Callable[[CollArgType], bool | Any] = str,
+               creator: type[Any] | CollCreatorFuncType = str, **creator_kwargs: Any) -> list[Any]:
     """ determine existing file/folder item(s) underneath the folder specified by :paramref:`.item_mask`.
 
     :param item_mask:           file path mask (with optional glob wildcards and :data:`PATH_PLACEHOLDERS`)
