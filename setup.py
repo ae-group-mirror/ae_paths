@@ -1,4 +1,4 @@
-# THIS FILE IS EXCLUSIVELY MAINTAINED by the project aedev.project_tpls v0.3.103
+# THIS FILE IS EXCLUSIVELY MAINTAINED by the project aedev.project_tpls v0.3.106
 """ setup of ae namespace module portion paths: file system path helpers. """
 import pathlib
 import sys
@@ -76,7 +76,7 @@ setup_kwargs: dict[str, Any] = {
     },
     'python_requires': '>=3.12',
     'url': 'https://gitlab.com/ae-group/ae_paths',
-    'version': '0.3.47',
+    'version': '0.3.48',
     'zip_safe': True,
 }
 

@@ -1,25 +1,27 @@
 """ ae.paths unit tests """
-import glob
 import os
 import pathlib
-import pytest
 import shutil
+
+import pytest
 import sys
 import types
 from ctypes import create_unicode_buffer
 from unittest.mock import patch, MagicMock
 
-from ae.base import (CFG_EXT, INI_EXT, PY_CACHE_FOLDER, TESTS_FOLDER,
-                     format_given, write_file)
+from ae.base import (
+    format_given, os_path_abspath, os_path_basename, os_path_dirname, os_path_expanduser, os_path_isfile, os_path_isdir,
+    os_path_join, os_path_realpath, os_path_relpath, os_path_splitext, write_file)
 from ae.system import app_name_guess, os_platform 
 from ae.files import read_file_text, write_file_text, CachedFile, RegisteredFile
 
-from ae.paths import (PATH_PLACEHOLDERS,
-                      add_common_storage_paths, app_data_path, app_docs_path, coll_folders, coll_items,
-                      copy_files, move_files, normalize, path_files, path_folders, path_items, path_join, path_match,
-                      path_name, paths_match, placeholder_key, placeholder_path, series_file_name, relative_file_paths,
-                      skip_py_cache_files, user_data_path, user_docs_path,
-                      Collector, FilesRegister)
+from ae.paths import (
+    I18N_FOLDER, IMAGE_FOLDER, PATH_PLACEHOLDERS, RESOURCES_NAMES, SOUND_FOLDER,
+    add_common_storage_paths, app_data_path, app_docs_path, coll_folders, coll_items,
+    copy_files, move_files, normalize, path_files, path_folders, path_items, path_join, path_match,
+    path_name, paths_match, placeholder_key, placeholder_path, series_file_name, relative_file_paths,
+    resources_folder_names, skip_py_cache_files, user_data_path, user_docs_path,
+    Collector, FilesRegister)
 
 try:
     import plyer
@@ -28,167 +30,86 @@ except (ModuleNotFoundError, ImportError):
     plyer_is_importable = False
 
 
-file_root = 'TstRootFolder'
-file_name = 'tst_file'
-file_ext = '.xy'
-file_without_properties = os.path.join(file_root, file_name + file_ext)
-file_properties = {'int': 72, 'float': 1.5, 'str': 'value'}
+# used project root folders/files for unit tests
+TST_MODULE = "ae/paths" + '.py'
+TST_SETUP = "setup" + '.py'
+TST_FOLDER_TESTS = 'tests'
+TST_TESTS_MODULE = os_path_join(TST_FOLDER_TESTS, "test_paths" + '.py')
+TST_TESTS_CONF_PATH = os_path_join(TST_FOLDER_TESTS, "conftest" + '.py')
+TST_TESTS_REQS_PATH = os_path_join(TST_FOLDER_TESTS, "requirements.txt")
+TST_TESTS_PY_FILES = [TST_TESTS_CONF_PATH, TST_TESTS_MODULE]
 
-root_files = ['setup.py']
-mod_files = ["ae/paths.py"]
-tst_paths = ['tests']
-tst_files = ["tests/conftest.py", "tests/test_paths.py"]
-tst_sub_folder = "tests/sub_dir"
-tst_sub_py_files1 = [f"{tst_sub_folder}/tst_sub_file.py"]
-tst_sub_files1 = tst_sub_py_files1 + [f"{tst_sub_folder}/tst_sub_wo_extension"]
-tst_sub_sub_folder = f"{tst_sub_folder}/sub_dir2"
-tst_sub_py_files2 = [f"{tst_sub_sub_folder}/tst_sub_sub_file.py"]
-tst_sub_files2 = tst_sub_py_files2 + [f"{tst_sub_sub_folder}/tst_sub_sub_wo_extension"]
-tst_sub_py_files = sorted([_ for _ in tst_sub_files1 + tst_sub_files2 if os.path.splitext(_)[1] == ".py"])
-tst_all_py_files = sorted(root_files + mod_files + tst_files + tst_sub_py_files)
+
+TST_TMP_ROOT = "tst_session_tmp_path"       # temp path/dir with session scope, initialized via _session_tmp_dir()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _session_tmp_dir(tmp_path_factory):
+    global TST_TMP_ROOT
+    TST_TMP_ROOT = str(tmp_path_factory.mktemp(TST_TMP_ROOT))
+
+
+TST_PROP_ROOT = 'TstRootFolder'
+TST_PROP_FILE = 'tst_file'
+TST_PROP_EXT = '.xy'
+TST_FILE_WITHOUT_PROPS = os_path_join(TST_PROP_ROOT, TST_PROP_FILE + TST_PROP_EXT)
+TST_PROPERTIES = {'int': 72, 'float': 1.5, 'str': 'value'}
 
 
 @pytest.fixture
-def test_sub_files():
-    """ provide deep folder test files with properties. """
-    files = []
-    os.mkdir(tst_sub_folder)
-    for fn in tst_sub_files1:
-        write_file(fn, f"file_content of sub {fn}")
-        files.append(fn)
-    os.mkdir(tst_sub_sub_folder)
-    for fn in tst_sub_files2:
-        write_file(fn, f"file_content of sub sub {fn}")
-        files.append(fn)
+def tst_prop_files(monkeypatch, tmp_path):
+    """ provide a test file with properties in temporary cwd """
+    monkeypatch.chdir(tmp_path)
+    fn = TST_PROP_ROOT
+    os.mkdir(fn)
+    write_file(TST_FILE_WITHOUT_PROPS, TST_FILE_CONTENT)
 
-    yield files
+    for name, value in TST_PROPERTIES.items():
+        fn = os_path_join(fn, name + "_" + str(value))
+        os.mkdir(fn)
 
-    shutil.rmtree(tst_sub_folder)
+    fn = os_path_join(fn, TST_PROP_FILE + TST_PROP_EXT)
+    write_file(fn, TST_FILE_CONTENT)
 
-
-def property_matcher_mock(file):
-    """ file property matcher mock. """
-    return file.properties == file_properties
+    yield TST_FILE_WITHOUT_PROPS, fn
 
 
-def file_loader_mock_func(file):
-    """ cacheables file object loader mock function """
+TST_OVER_FOLDER_NAME = "tst_ae_paths_over_src"
+TST_INI_FILE = "tst_app" + '.ini'
+TST_FILE_CONTENT = "TEST FILE CONTENT"
+TST_OLD_CONTENT = "OLD/LOCKED TEST FILE CONTENT"
+TST_NEW_CONTENT = "NEW TEST FILE CONTENT"
+
+
+@pytest.fixture(params=["tst_ae_paths_src", TST_OVER_FOLDER_NAME])
+def tst_move_files(request, tmp_path):
+    """ create test files in a temporary source directory to be moved and/or overwritten. """
+    src_dir = tmp_path / request.param
+    src_dir.mkdir()
+
+    src_file1 = src_dir / TST_INI_FILE
+    src_file1.write_text(TST_FILE_CONTENT)
+    src_sub_dir = src_dir / "tst_app_dir"
+    src_sub_dir.mkdir()
+    src_file2 = src_sub_dir / "tst_app.png"
+    src_file2.write_text(TST_NEW_CONTENT)
+
+    yield str(src_file1), str(src_file2)
+
+
+def tst_property_matcher(file):
+    """ file property tests matcher """
+    return file.properties == TST_PROPERTIES
+
+
+def tst_file_loader(file):
+    """ cacheables file object loader tests function """
     return file
 
 
-def file_sorter_mock(file):
-    """ file sorter mock. """
+def tst_file_sorter(file):
+    """ tests file sorter """
     return file.properties.get('int', 0)
-
-
-class TestHelpers:
-    def test_path_join(self):
-        assert path_join("") == os.path.join("")
-        assert path_join('part') == os.path.join('part')
-        assert path_join('part', 'part2') == os.path.join('part', 'part2')
-        assert path_join('part', '', 'part2') == os.path.join('part', '', 'part2')
-        assert path_join('part', ".", 'part2') == os.path.join('part', ".", 'part2')
-        assert path_join('part', "..", 'part2') == os.path.join('part', "..", 'part2')
-        assert path_join('part', "/part2") == os.path.join('part', "/part2")
-        assert path_join('part', "/", 'part2') == os.path.join('part', "/", 'part2')
-        assert path_join('part', "//", 'part2') == os.path.join('part', "//", 'part2')
-        assert path_join("/part", 'part2') == os.path.join("/part", 'part2')
-        assert path_join('', 'part2') == os.path.join('', 'part2')
-
-        assert path_join('part', '') == 'part'  # os.path.join() returns "part/" in this case
-        assert path_join('part', '') != os.path.join('part', '')
-
-    def test_path_match(self):
-        assert path_match('c.py', "?.py")
-        assert path_match('c.py', "?.p?")
-        assert not path_match('c.py', "??.p?")
-        assert not path_match('c.py', "?.p??")
-
-        assert path_match('c.py', "*")
-        assert path_match('c.py', "*.py")
-        assert path_match('c.py', "c.py")
-
-        assert path_match('c.py', "**/*.py")
-        assert path_match("a/b/c.py", "**/*.py")
-        assert path_match("/a/b/c.py", "**/*.py")
-        assert path_match("a/b/c.py", "a/**")
-        assert path_match("/a/b/c.py", "/a/**")
-        assert path_match("a/b/c.py", "a/**/b/**")
-        assert path_match("/a/b/c.py", "/a/**/b/**")
-        assert path_match("a/b/c.py", "a/**/b/**/c.*")
-        assert path_match("/a/b/c.py", "/a/**/b/**/c.*")
-        assert not path_match("a/b/c.py", "a/*")
-        assert not path_match("/a/b/c.py", "a/*")
-        assert not path_match("a/b/c.py", "a**/*.py")
-        assert not path_match("/a/b/c.py", "a**/*.py")
-        assert not path_match("a/b/c.py", "/a/**")
-        assert not path_match("/a/b/c.py", "a/**")
-
-        assert path_match('abc.py', "[axy]bc.py")
-        assert path_match('abc.py', "ab[cxy].py")
-        assert path_match('abc.py', "ab[!dxy].py")
-
-    def test_path_match_py313(self):
-        with (patch('ae.paths.sys.version_info', (3, 13)),
-              patch('ae.paths.PurePath') as mock_full_match):
-            assert path_match('c.py', "?.py")
-
-        mock_full_match.assert_called_once_with('c.py')
-        mock_full_match.return_value.full_match.assert_called_once_with('?.py')
-
-    def test_path_name(self):
-        assert path_name("") == ""
-        assert path_name("/not/a/existing/test/path") == ""
-        assert path_name(".") == ""
-
-        duplicates1 = ('cwd', 'application')
-        duplicates2 = ('doc', 'documents')
-        for name, path in PATH_PLACEHOLDERS.items():
-            if path_name(path) == 'external_storage':
-                assert name == 'external_storage' or path.endswith(name)
-            else:
-                names = duplicates1 if name in duplicates1 else duplicates2 if name in duplicates2 else (name,)
-                assert path_name(path) in names
-
-    def test_paths_match(self):
-        assert list(paths_match(['c.py'], ["**/*.py"])) == ['c.py']
-        assert list(paths_match(['a.py', "a/b/c.d"], ["**/*.py"])) == ['a.py']
-        assert set(paths_match(['a.py', "a/b/c.py"], ["**/*.py"])) == {'a.py', "a/b/c.py"}
-        assert list(paths_match(['c.py'], ["**/*.py", 'file.name'])) == ['c.py']
-        assert list(paths_match(['file.name', 'x.y'], ["**/*.d", 'file.name'])) == ['file.name']
-        assert list(paths_match(['c.py'], ["**/*.d", 'file.name'])) == []
-
-    def test_relative_file_paths(self):
-        assert relative_file_paths("", []) == set()
-        assert not relative_file_paths("", [])
-        assert not relative_file_paths("", ['NonExistingPackageName'])
-
-        files = relative_file_paths("", ["*"])
-
-        assert files
-        assert 'setup.py' in files
-        assert not any("/" in _.replace("\\", "/") for _ in files)
-        assert not any(_.startswith(".") for _ in files)
-
-        files = relative_file_paths("", [".*"])
-
-        assert files
-        assert '.gitignore' in files
-        assert not any("/" in _.replace("\\", "/") for _ in files)
-        assert all(_.startswith(".") for _ in files)
-
-        files = relative_file_paths("", [os.path.join("**", "*.py")])
-
-        assert files == {'setup.py', "tests/test_paths.py", "tests/conftest.py", "ae/paths.py"}
-
-        assert files == relative_file_paths("", [os.path.join("**", "*")], skip_file_path=lambda fp: fp[-3:] != ".py")
-
-    def test_skip_py_cache_files(self):
-        assert skip_py_cache_files(PY_CACHE_FOLDER)
-        assert skip_py_cache_files(f"a/c/c/{PY_CACHE_FOLDER}")
-        assert skip_py_cache_files(f"/a/c/c/{PY_CACHE_FOLDER}")
-        assert skip_py_cache_files(f"a/c/c/{PY_CACHE_FOLDER}/.")
-        assert skip_py_cache_files(f"a/c/c/{PY_CACHE_FOLDER}/x.py")
 
 
 class TestAddCommonStoragePaths:
@@ -322,769 +243,46 @@ class TestAddCommonStoragePaths:
             add_common_storage_paths()
 
 
-class TestPathPlaceholdersGlobal:
-    def test_add_common_storage_paths(self):
-        paths_count = len(PATH_PLACEHOLDERS)
-        add_common_storage_paths()
-        assert len(PATH_PLACEHOLDERS) >= paths_count                # 6 >= 6
-        if 'CI_PROJECT_ID' not in os.environ:                       # skip on GitLab CI
-            assert len(PATH_PLACEHOLDERS) > paths_count
-            if plyer_is_importable:
-                assert 'application' in PATH_PLACEHOLDERS
-                assert 'documents' in PATH_PLACEHOLDERS
-                assert 'downloads' in PATH_PLACEHOLDERS
-                assert 'external_storage' in PATH_PLACEHOLDERS
-                assert 'home' in PATH_PLACEHOLDERS
-                assert 'music' in PATH_PLACEHOLDERS
-                assert 'pictures' in PATH_PLACEHOLDERS
-                assert 'root' in PATH_PLACEHOLDERS
-                assert 'videos' in PATH_PLACEHOLDERS
-        if os_platform == 'android':
-            assert 'sdcard' in PATH_PLACEHOLDERS
-
-    def test_normalize(self):
-        f_path = "norm_file.tst"
-        assert normalize(f_path, make_absolute=False, remove_dots=False, resolve_sym_links=False) == f_path
-        assert normalize(f_path, make_absolute=False, remove_dots=False) == os.path.realpath(f_path)
-        assert normalize(f_path, make_absolute=False, resolve_sym_links=False) == f_path
-        assert normalize(f_path, make_absolute=False) == os.path.realpath(f_path)
-        assert normalize(f_path, remove_dots=False, resolve_sym_links=False) == os.path.abspath(f_path)
-        assert normalize(f_path, remove_dots=False) == os.path.realpath(f_path)
-        assert normalize(f_path, resolve_sym_links=False) == os.path.abspath(f_path)
-        assert normalize(f_path) == os.path.realpath(f_path)
-
-        f_path = f"{TESTS_FOLDER}/norm_test.tst"
-        assert normalize(f_path, make_absolute=False, remove_dots=False, resolve_sym_links=False) == f_path
-        assert normalize(f_path, make_absolute=False, remove_dots=False) == os.path.realpath(f_path)
-        assert normalize(f_path, make_absolute=False, resolve_sym_links=False) == f_path
-        assert normalize(f_path, make_absolute=False) == os.path.realpath(f_path)
-        assert normalize(f_path, remove_dots=False, resolve_sym_links=False) == os.path.abspath(f_path)
-        assert normalize(f_path, remove_dots=False) == os.path.realpath(f_path)
-        assert normalize(f_path, resolve_sym_links=False) == os.path.abspath(f_path)
-        assert normalize(f_path) == os.path.realpath(f_path)
-        assert normalize(f_path, remove_base_path=TESTS_FOLDER) == "norm_test.tst"
-        assert normalize(f_path, remove_base_path=TESTS_FOLDER) == os.path.relpath(f_path, TESTS_FOLDER)
-        assert normalize(f_path, remove_base_path='_not_existing_') == (
-            f"../{TESTS_FOLDER}/{os.path.relpath(f_path, TESTS_FOLDER)}")
-        assert f"../{TESTS_FOLDER}/{normalize(f_path, remove_base_path=TESTS_FOLDER)}" == os.path.relpath(
-            f_path, "_not_exists_folder")
-
-        f_path = f"_not_existing_folder/norm_test.tst"
-        assert normalize(f_path, make_absolute=False, remove_dots=False, resolve_sym_links=False) == f_path
-        assert normalize(f_path, make_absolute=False, remove_dots=False) == os.path.realpath(f_path)
-        assert normalize(f_path, make_absolute=False, resolve_sym_links=False) == f_path
-        assert normalize(f_path, make_absolute=False) == os.path.realpath(f_path)
-        assert normalize(f_path, remove_dots=False, resolve_sym_links=False) == os.path.abspath(f_path)
-        assert normalize(f_path, remove_dots=False) == os.path.realpath(f_path)
-        assert normalize(f_path, resolve_sym_links=False) == os.path.abspath(f_path)
-        assert normalize(f_path) == os.path.realpath(f_path)
-        assert normalize(f_path, remove_base_path=TESTS_FOLDER) == f"../{f_path}"
-        assert normalize(f_path, remove_base_path=TESTS_FOLDER) == os.path.relpath(f_path, TESTS_FOLDER)
-        assert normalize(f_path, remove_base_path='_not_existing_') == os.path.relpath(f_path, TESTS_FOLDER)
-        assert normalize(f_path, remove_base_path=TESTS_FOLDER) == os.path.relpath(
-            f_path, "_not_exists_folder")
-
-        f_path = "~/normalize_test.tst"
-        assert len(normalize(f_path)) > len(f_path)
-        assert normalize(f_path, make_absolute=False, remove_dots=False, resolve_sym_links=False).endswith(f_path[1:])
-        assert normalize(f_path).endswith(f_path[1:])
-
-        f_path = "."
-        assert normalize(f_path, make_absolute=False, remove_dots=False, resolve_sym_links=False) == "."
-        assert len(normalize(f_path)) == len(os.getcwd())
-
-        f_path = ""
-        assert normalize(f_path, make_absolute=False, remove_dots=False, resolve_sym_links=False) == "."
-        assert len(normalize(f_path)) == len(os.getcwd())
-
-    def test_placeholder_key(self):
-        f_name = "test.tst"
-        file_path = os.path.join(os.getcwd(), f_name)
-        assert placeholder_key(f_name) == ""
-        assert placeholder_key(file_path) == "cwd"
-        assert placeholder_key(file_path).format(**PATH_PLACEHOLDERS) == "cwd"
-        assert format_given(placeholder_key(file_path), PATH_PLACEHOLDERS) == "cwd"
-
-    def test_placeholder_path(self):
-        f_name = "test.tst"
-        file_path = os.path.join(os.getcwd(), f_name)
-        assert placeholder_path(f_name) == f_name
-        assert placeholder_path(file_path) == "{cwd}" + "/" + f_name
-        assert placeholder_path(file_path).format(**PATH_PLACEHOLDERS) == file_path
-        assert format_given(placeholder_path(file_path), PATH_PLACEHOLDERS) == file_path
-        assert normalize(placeholder_path(file_path)) == file_path
-
-    def test_placeholder_path_exact_dir_name(self):
-        f_name = "test.tst"
-        file_path = os.path.join(os.getcwd() + "_dir_name_extended", f_name)
-        assert not placeholder_path(file_path).startswith("{cwd}")
-        # the next assertion would fail because placeholder_path(file_path) == "{home}/src/ae_paths_extended/test.tst"
-        # assert placeholder_path(file_path) == file_path
-
-
 class TestAppPaths:
     def test_app_data_path(self):
         assert app_data_path()
         assert app_data_path().endswith(app_name_guess())
         assert app_data_path().startswith(user_data_path())
 
+    def test_app_data_path_placeholder(self):
+        assert 'app' in PATH_PLACEHOLDERS
+
     def test_app_docs_path(self):
         assert app_docs_path()
         assert app_docs_path().endswith(app_name_guess())
         assert app_docs_path().startswith(user_docs_path())
 
+    def test_app_docs_path_placeholder(self):
+        assert 'ado' in PATH_PLACEHOLDERS
 
-class TestUserDataPath:
-    @pytest.mark.parametrize("platform", ('linux', 'freebsd', 'any_other_os'))
-    def test_user_data_path_all_linux(self, platform):
-        tst_dir = "/.config"
+    def test_app_name_placeholder(self):
+        assert 'app_name' in PATH_PLACEHOLDERS
 
-        with patch('ae.paths.os_platform', platform):
-            assert user_data_path().endswith(tst_dir)
+    def test_app_i18n_resources_folder_placeholder(self):
+        assert 'loc' in PATH_PLACEHOLDERS
 
-        with patch('ae.paths.os_platform', platform), patch.dict('os.environ', dict(XDG_CONFIG_HOME="")):
-            assert user_data_path().endswith(tst_dir)
+    def test_app_image_resources_folder_placeholder(self):
+        assert 'img' in PATH_PLACEHOLDERS
 
-        with patch('ae.paths.os_platform', platform), patch.dict('os.environ', dict(XDG_CONFIG_HOME=tst_dir)):
-            assert user_data_path().endswith(tst_dir)
+    def test_app_sound_resources_folder_placeholder(self):
+        assert 'snd' in PATH_PLACEHOLDERS
 
-    def test_user_data_path_android(self):
-        mock_jnius = MagicMock()
-        mock_cls = mock_jnius.cast.return_value
-        mock_cls.getAbsolutePath.return_value = '/android/tst/data/dir'
+    def test_resources_folder_names(self):
+        assert resources_folder_names() == list(RESOURCES_NAMES)
+        assert resources_folder_names(resource_types={I18N_FOLDER}) == [I18N_FOLDER]
+        assert resources_folder_names(resource_types=[IMAGE_FOLDER]) == [IMAGE_FOLDER]
+        assert resources_folder_names(resource_types={SOUND_FOLDER: "any"}) == [SOUND_FOLDER]
+        assert resources_folder_names(resource_types=RESOURCES_NAMES[1:]) == list(RESOURCES_NAMES[1:])
 
-        with (patch('ae.paths.os_platform', 'android'),
-              patch('ae.paths.importlib.import_module', return_value=mock_jnius) as imp_mock):
-            assert user_data_path() == '/android/tst/data/dir'
+        assert resources_folder_names(path_placeholders=PATH_PLACEHOLDERS) == list(RESOURCES_NAMES)
+        assert resources_folder_names(path_placeholders={I18N_FOLDER: 'tstDir'}) == ['tstDir'] + list(RESOURCES_NAMES)
 
-        imp_mock.assert_called_once_with('jnius')
-        mock_jnius.autoclass.assert_called_once_with('org.kivy.android.PythonActivity')
-
-    def test_user_data_path_cygwin(self):
-        test_root = "/test_path"
-        with patch('ae.paths.os_platform', 'cygwin'), patch.dict('os.environ', dict(APPDATA=test_root)):
-            assert user_data_path() == test_root
-
-    def test_user_data_path_darwin(self):
-        with patch('ae.paths.os_platform', 'darwin'):
-            assert user_data_path() == os.path.expanduser(os.path.join("~", "Library", "Application Support"))
-
-    def test_user_data_path_ios(self):
-        with patch('ae.paths.os_platform', 'ios'):
-            assert user_data_path() == os.path.expanduser(os.path.join("~", "Documents"))
-
-    # @pytest.mark.skipif("os_platform != 'android'", reason="android-only test")
-    # def test_user_data_path_running_android(self):
-    #     with patch.dict('os.environ', dict(ANDROID_ARGUMENT='any_value')):
-    #         assert user_data_path()
-    #     with patch.dict('os.environ', dict(KIVY_BUILD='any_value')):
-    #         assert user_data_path()
-
-    def test_user_data_path_win32(self):
-        test_root = "/test_path"
-        with patch('ae.paths.os_platform', 'win32'), patch.dict('os.environ', dict(APPDATA=test_root)):
-            assert user_data_path() == test_root
-
-
-class TestUserDocsPath:
-    @pytest.mark.parametrize("platform", ('darwin', 'ios', 'linux', 'freebsd', 'any_other_os'))
-    def test_user_docs_path_all_posix(self, platform):
-        with patch('ae.paths.os_platform', platform):
-            assert user_docs_path() == os.path.expanduser(os.path.join("~", "Documents"))
-
-    def test_user_docs_path_android(self):
-        mock_jnius = MagicMock()
-        mock_cls = mock_jnius.autoclass.return_value
-        mock_cls.DIRECTORY_DOCUMENTS = 'DocumentsDir'
-        mock_cls.getExternalStoragePublicDirectory.return_value.getAbsolutePath.return_value = '/android/tst/docs/dir'
-
-        with (patch('ae.paths.os_platform', 'android'),
-              patch('ae.paths.importlib.import_module', return_value=mock_jnius) as imp_mock):
-            assert user_docs_path() == '/android/tst/docs/dir'
-
-        imp_mock.assert_called_once_with('jnius')
-        mock_jnius.autoclass.assert_called_once_with('android.os.Environment')
-        mock_cls.getExternalStoragePublicDirectory.assert_called_once_with('DocumentsDir')
-
-    def test_user_docs_path_cygwin(self):
-        test_root = "/tst_usr_root"
-        with patch('ae.paths.os_platform', 'cygwin'), patch.dict('os.environ', dict(USERPROFILE=test_root)):
-            assert user_docs_path() == test_root + "/Documents"
-
-    def test_user_docs_path_darwin(self):
-        with patch('ae.paths.os_platform', 'darwin'):
-            assert user_docs_path() == os.path.expanduser(os.path.join("~", "Documents"))
-
-    def test_user_docs_path_ios(self):
-        with patch('ae.paths.os_platform', 'ios'):
-            assert user_docs_path() == os.path.expanduser(os.path.join("~", "Documents"))
-
-    # @pytest.mark.skipif("os_platform != 'android'", reason="android-only test")
-    # def test_user_docs_path_running_on_android(self):
-    #     with patch.dict('os.environ', dict(ANDROID_ARGUMENT='any_value')):
-    #         assert user_docs_path()
-    #     with patch.dict('os.environ', dict(KIVY_BUILD='any_value')):
-    #         assert user_docs_path()
-
-    def test_user_docs_path_win32(self):
-        test_root = "/test_usr_path"
-        with patch('ae.paths.os_platform', 'win32'), patch.dict('os.environ', dict(USERPROFILE=test_root)):
-            assert user_docs_path() == test_root + "/Documents"
-
-
-FILE0 = "app" + INI_EXT
-CONTENT0 = "TEST FILE0 CONTENT"
-OLD_CONTENT0 = "OLD/LOCKED FILE0 CONTENT"
-
-DIR1 = "app_dir"
-FILE1 = "app.png"
-CONTENT1 = "TEST FILE1 CONTENT"
-
-TST_MOVE_FOLDER_NAME = "tst_ae_paths_src"
-TST_OVER_FOLDER_NAME = "tst_ae_paths_over_src"
-
-
-@pytest.fixture
-def files_to_test():
-    """ provide a temporary test file with properties. """
-    fn = file_root
-    os.mkdir(fn)
-    write_file(file_without_properties, CONTENT0)
-
-    for name, value in file_properties.items():
-        fn = os.path.join(fn, name + "_" + str(value))
-        os.mkdir(fn)
-    fn = os.path.join(fn, file_name + file_ext)
-    write_file(fn, CONTENT0)
-
-    yield file_without_properties, fn
-
-    shutil.rmtree(file_root)
-
-
-@pytest.fixture(params=[TST_MOVE_FOLDER_NAME, TST_OVER_FOLDER_NAME])
-def files_to_move(request, tmp_path):
-    """ create test files in a temporary source directory to be moved and/or overwritten. """
-    src_dir = tmp_path / request.param
-    src_dir.mkdir()
-
-    src_file1 = src_dir / FILE0
-    src_file1.write_text(CONTENT0)
-    src_sub_dir = src_dir / DIR1
-    src_sub_dir.mkdir()
-    src_file2 = src_sub_dir / FILE1
-    src_file2.write_text(CONTENT1)
-
-    yield str(src_file1), str(src_file2)
-
-
-class TestCopyFiles:
-    def test_copy_to_parent_dir(self, files_to_move):
-        src_dir = os.path.dirname(files_to_move[0])
-        dst_dir = os.path.join(src_dir, "..")
-        for src_file_path in files_to_move:
-            assert os.path.exists(src_file_path)
-            assert not os.path.exists(os.path.join(dst_dir, os.path.relpath(src_file_path, src_dir)))
-        tst_overwrite = (TST_OVER_FOLDER_NAME in src_dir)
-
-        copy_files(src_dir, dst_dir, overwrite=tst_overwrite)
-
-        if not tst_overwrite:
-            for src_file_path in files_to_move:
-                assert os.path.exists(src_file_path)
-                assert os.path.exists(os.path.join(dst_dir, os.path.relpath(src_file_path, src_dir)))
-
-    def test_blocked_copy_to_parent_dir(self, files_to_move):
-        src_dir = os.path.dirname(files_to_move[0])
-        dst_dir = os.path.join(src_dir, "..")
-        dst_block_file = os.path.join(dst_dir, FILE0)
-        write_file_text(OLD_CONTENT0, dst_block_file)
-        assert os.path.exists(dst_block_file)
-        for src_file_path in files_to_move:
-            assert os.path.exists(src_file_path)
-            dst_file = os.path.join(dst_dir, os.path.relpath(src_file_path, src_dir))
-            assert dst_file == dst_block_file or not os.path.exists(dst_file)
-        tst_overwrite = (TST_OVER_FOLDER_NAME in src_dir)
-
-        copy_files(src_dir, dst_dir, overwrite=tst_overwrite)
-
-        if not tst_overwrite:
-            assert os.path.exists(files_to_move[0])
-            assert read_file_text(files_to_move[0]) == CONTENT0
-            dst_file = os.path.join(dst_dir, os.path.relpath(files_to_move[0], src_dir))
-            assert os.path.exists(dst_file)
-            assert read_file_text(dst_file) == OLD_CONTENT0
-
-            assert os.path.exists(files_to_move[1])
-            dst_file = os.path.join(dst_dir, os.path.relpath(files_to_move[1], src_dir))
-            assert os.path.exists(dst_file)
-            assert read_file_text(dst_file) == CONTENT1
-
-
-class TestMoveFiles:
-    def test_moves_to_parent_dir(self, files_to_move):
-        src_dir = os.path.dirname(files_to_move[0])
-        dst_dir = os.path.join(src_dir, "..")
-        for src_file_path in files_to_move:
-            assert os.path.exists(src_file_path)
-            assert not os.path.exists(os.path.join(dst_dir, os.path.relpath(src_file_path, src_dir)))
-        tst_overwrite = (TST_OVER_FOLDER_NAME in src_dir)
-
-        move_files(src_dir, dst_dir, overwrite=tst_overwrite)
-
-        if not tst_overwrite:
-            for src_file_path in files_to_move:
-                assert not os.path.exists(src_file_path)
-                assert os.path.exists(os.path.join(dst_dir, os.path.relpath(src_file_path, src_dir)))
-
-    def test_blocked_moves_to_parent_dir(self, files_to_move):
-        src_dir = os.path.dirname(files_to_move[0])
-        dst_dir = os.path.join(src_dir, "..")
-        dst_block_file = os.path.join(dst_dir, FILE0)
-        write_file_text(OLD_CONTENT0, dst_block_file)
-        assert os.path.exists(dst_block_file)
-        for src_file_path in files_to_move:
-            assert os.path.exists(src_file_path)
-            dst_file = os.path.join(dst_dir, os.path.relpath(src_file_path, src_dir))
-            assert dst_file == dst_block_file or not os.path.exists(dst_file)
-        tst_overwrite = (TST_OVER_FOLDER_NAME in src_dir)
-
-        move_files(src_dir, dst_dir, overwrite=tst_overwrite)
-
-        if not tst_overwrite:
-            assert os.path.exists(files_to_move[0])
-            assert read_file_text(files_to_move[0]) == CONTENT0
-            dst_file = os.path.join(dst_dir, os.path.relpath(files_to_move[0], src_dir))
-            assert os.path.exists(dst_file)
-            assert read_file_text(dst_file) == OLD_CONTENT0
-
-            assert not os.path.exists(files_to_move[1])
-            dst_file = os.path.join(dst_dir, os.path.relpath(files_to_move[1], src_dir))
-            assert os.path.exists(dst_file)
-            assert read_file_text(dst_file) == CONTENT1
-
-    def test_overwrites_to_parent_dir(self, files_to_move):
-        src_dir = os.path.dirname(files_to_move[0])
-        dst_dir = os.path.join(src_dir, "..")
-        for src_file_path in files_to_move:
-            assert os.path.exists(src_file_path)
-            assert not os.path.exists(os.path.join(dst_dir, os.path.relpath(src_file_path, src_dir)))
-        tst_overwrite = (TST_OVER_FOLDER_NAME in src_dir)
-
-        move_files(src_dir, dst_dir, overwrite=tst_overwrite)
-
-        if tst_overwrite:
-            for src_file_path in files_to_move:
-                assert not os.path.exists(src_file_path)
-                assert os.path.exists(os.path.join(dst_dir, os.path.relpath(src_file_path, src_dir)))
-
-    def test_unblocked_overwrites_to_parent_dir(self, files_to_move):
-        src_dir = os.path.dirname(files_to_move[0])
-        dst_dir = os.path.join(src_dir, "..")
-        dst_block_file = os.path.join(dst_dir, FILE0)
-        write_file_text(OLD_CONTENT0, dst_block_file)
-        assert os.path.exists(dst_block_file)
-        for src_file_path in files_to_move:
-            assert os.path.exists(src_file_path)
-            dst_file = os.path.join(dst_dir, os.path.relpath(src_file_path, src_dir))
-            assert dst_file == dst_block_file or not os.path.exists(dst_file)
-        tst_overwrite = (TST_OVER_FOLDER_NAME in src_dir)
-
-        move_files(src_dir, dst_dir, overwrite=tst_overwrite)
-
-        if tst_overwrite:
-            assert not os.path.exists(files_to_move[0])
-            dst_file = os.path.join(dst_dir, os.path.relpath(files_to_move[0], src_dir))
-            assert os.path.exists(dst_file)
-            assert read_file_text(dst_file) == CONTENT0
-
-            assert not os.path.exists(files_to_move[1])
-            dst_file = os.path.join(dst_dir, os.path.relpath(files_to_move[1], src_dir))
-            assert os.path.exists(dst_file)
-            assert read_file_text(dst_file) == CONTENT1
-
-    def test_file_moves_to_user_dir_via_check_all(self, files_to_move):
-        src_dir = os.path.dirname(files_to_move[0])
-        dst_dir = user_data_path()
-
-        moved = []
-        try:
-            moved += move_files(src_dir, "{usr}")
-
-            for src_file_path in files_to_move:
-                assert not os.path.exists(src_file_path)
-                assert os.path.exists(os.path.join(dst_dir, os.path.relpath(src_file_path, src_dir)))
-        finally:
-            for dst_file_path in moved:
-                dst_path = os.path.relpath(dst_file_path, dst_dir)
-                if os.path.exists(dst_file_path):
-                    os.remove(dst_file_path)
-                    if dst_path != os.path.basename(dst_file_path):
-                        shutil.rmtree(os.path.dirname(dst_file_path))
-
-
-class TestPathFiles:
-    def test_without_placeholders_and_wildcards(self):
-        assert path_files("setup.py") == ["setup.py"]
-        assert path_files("ae/paths.py") == ["ae/paths.py"]
-        assert path_files("tests/test_paths.py") == ["tests/test_paths.py"]
-
-        assert path_files("../ae_paths") == []
-        assert path_files("../ae_paths/setup.py") == ["../ae_paths/setup.py"]
-
-        assert path_files(".") == []
-        assert all(_[0] == "." for _ in path_files("."))
-        assert path_files("./setup.py") == ["./setup.py"]
-
-        assert path_files("ae") == []
-        assert "ae/paths.py" not in path_files("ae")        # can also contain __pycache__/paths.cpython-36.pyc
-        assert path_files("ae/paths.py") == ["ae/paths.py"]
-
-        assert path_files("tests") == []
-        assert "tests/test_paths.py" not in path_files("tests")
-        assert path_files("tests/test_paths.py") == ["tests/test_paths.py"]
-
-    def test_non_recursive(self):
-        assert path_files("setup.py") == ["setup.py"]
-        assert path_files("ae/paths.py") == ["ae/paths.py"]
-        assert path_files("tests/test_paths.py") == ["tests/test_paths.py"]
-
-        assert path_files("../ae_paths") == []
-        assert path_files("../ae_paths/setup.py") == ["../ae_paths/setup.py"]
-
-        assert path_files(".") == []
-        assert path_files("./setup.py") == ["./setup.py"]
-        assert path_files("./ae/paths.py") == ["./ae/paths.py"]
-
-        assert path_files("ae") == []
-        assert path_files("ae/paths.py") == ["ae/paths.py"]
-
-        assert path_files("tests") == []
-        assert path_files("tests/test_paths.py") == ["tests/test_paths.py"]
-
-    def test_placeholders(self):
-        assert len(path_files("{cwd}")) == len(path_files("."))
-        assert path_files("{cwd}/ae/paths.py")[0].endswith("/ae_paths/ae/paths.py")
-
-        assert len(path_files("{cwd}/**/*.py")) == 4  # ...setup.py, ...paths.py, ...test_paths.py, ...conftest.py
-        assert all(_.endswith(".py") for _ in path_files("{cwd}/**/*.py"))
-        assert all(_.startswith("/") for _ in path_files("{cwd}/**/*.py"))
-
-    def test_wildcards(self):
-        assert path_files("*.py") == ["setup.py"]
-        assert path_files("**.py") == ["setup.py"]
-
-        assert path_files("set??.py") == ["setup.py"]
-        assert path_files("setup*.py") == ["setup.py"]
-        assert path_files("setup**.py") == ["setup.py"]
-
-        assert "ae/paths.py" in path_files("ae/**")
-        assert path_files("ae/**/*.py") == ["ae/paths.py"]
-        assert path_files("**/pat?s.py") == ["ae/paths.py"]
-
-        assert len(path_files("**/*.py")) == 4
-        assert set(path_files("**/*.py")) == {"setup.py", "ae/paths.py", "tests/test_paths.py", "tests/conftest.py"}
-
-        assert path_files("{cwd}/**/paths.py")[0].endswith("ae_paths/ae/paths.py")
-        assert path_files("{cwd}/**/paths.?y")[0].endswith("ae_paths/ae/paths.py")
-
-        assert len(path_files("{cwd}/**/*paths.py")) == 2
-        assert len(path_files("{cwd}/**/*paths.?y")) == 2
-
-    def test_file_callable(self):
-        def add_file(f_name, **kwargs):
-            """ callable used for the file_class argument of path_files. """
-            added.append((f_name, kwargs))
-            return f_name
-        added = []
-        found = path_files("**.py", file_class=add_file, a=1, b=2)
-
-        assert len(found) == len(added)
-        assert len(found) == 1
-        assert found[0] == "setup.py"
-        assert added[0][0] == found[0]
-        assert added[0][1] == dict(a=1, b=2)
-
-    def test_file_class(self):
-        class FileClass:
-            """ class used for the file_class argument of path_files. """
-            def __init__(self, f_name, **kwargs):
-                self.file_name = f_name
-                self.stem = os.path.splitext(f_name)[0]
-                added.append((f_name, kwargs))
-        added = []
-        found = path_files("*.py", file_class=FileClass, a=3, b=6)
-
-        assert len(found) == len(added)
-        assert len(found) == 1
-        assert found[0].file_name == "setup.py"
-        assert found[0].stem == "setup"
-        assert added[0][0] == found[0].file_name
-        assert added[0][1] == dict(a=3, b=6)
-
-    def test_path_lib(self):
-        found = path_files("*.py", file_class=pathlib.PurePath)
-
-        assert len(found) == 1
-        assert found[0].name == "setup.py"
-        assert found[0].stem == "setup"
-
-        found = path_files("*.py", file_class=pathlib.Path)
-
-        assert len(found) == 1
-        assert found[0].name == "setup.py"
-        assert found[0].stem == "setup"
-
-
-class TestPathFolders:
-    def test_without_placeholders_and_wildcards(self):
-        assert path_folders("setup.py") == []
-        assert path_folders("ae/paths.py") == []
-        assert path_folders("tests/test_paths.py") == []
-
-        assert path_folders("../ae_paths") == ["../ae_paths"]
-        assert path_folders("../ae_paths/setup.py") == []
-
-        assert path_folders(".") == ["."]
-        assert all(_[0] == "." for _ in path_folders("."))
-        assert path_folders("./setup.py") == []
-
-        assert path_folders("ae") == ["ae"]
-        assert "ae/paths.py" not in path_folders("ae")        # can also contain __pycache__/paths.cpython-36.pyc
-        assert path_folders("ae/paths.py") == []
-
-        assert path_folders("tests") == ["tests"]
-        assert "tests/test_paths.py" not in path_folders("tests")
-        assert path_folders("tests/test_paths.py") == []
-
-    def test_non_recursive(self):
-        assert path_folders("setup.py") == []
-        assert path_folders("ae/paths.py") == []
-        assert path_folders("tests/test_paths.py") == []
-
-        assert path_folders("../ae_paths") == ["../ae_paths"]
-        assert path_folders("../ae_paths/setup.py") == []
-
-        assert path_folders(".") == ["."]
-        assert path_folders("./setup.py") == []
-        assert path_folders("./ae/paths.py") == []
-
-        assert path_folders("ae") == ["ae"]
-        assert path_folders("ae/paths.py") == []
-
-        assert path_folders("tests") == ["tests"]
-        assert path_folders("tests/test_paths.py") == []
-
-    def test_placeholders(self):
-        assert len(path_folders("{cwd}")) == len(path_folders("."))
-        assert path_folders("{cwd}/ae")[0].endswith("/ae_paths/ae")
-
-        assert path_folders("{cwd}/**")
-        assert any(_.endswith("/ae_paths/ae") for _ in path_folders("{cwd}/**"))
-        assert any(_.endswith("/ae_paths/tests") for _ in path_folders("{cwd}/**"))
-        assert all(_.startswith("/") for _ in path_folders("{cwd}/**"))
-
-    def test_wildcards(self):
-        assert path_folders("*.py") == []
-        assert path_folders("**.py") == []
-
-        assert path_folders("set??.py") == []
-        assert path_folders("setup*.py") == []
-        assert path_folders("setup**.py") == []
-
-        assert "../ae_paths/ae" in path_folders("../ae_paths/**")
-        assert "../ae_paths/ae/" in path_folders("../ae_paths/ae/**")
-
-        assert path_folders("**")
-        assert "ae" in path_folders("**")
-        assert "tests" in path_folders("**")
-
-        assert any(_.endswith("ae_paths/ae") for _ in path_folders("{cwd}/**"))
-        assert any(_.endswith("ae_paths/ae/") for _ in path_folders("{cwd}/**/"))
-
-    def test_folder_callable(self):
-        def add_folder(folder_name, **kwargs):
-            """ callable used for the file_class argument of path_folders. """
-            added.append((folder_name, kwargs))
-            return folder_name
-        added = []
-        found = path_folders("tests", folder_class=add_folder, a=1, b=2)
-
-        assert len(found) == len(added)
-        assert len(found) == 1
-        assert found[0] == "tests"
-        assert added[0][0] == found[0]
-        assert added[0][1] == dict(a=1, b=2)
-
-    def test_file_class(self):
-        class FileClass:
-            """ class used for the file_class argument of path_folders. """
-            def __init__(self, f_name, **kwargs):
-                self.folder_name = f_name
-                self.stem = os.path.splitext(f_name)[0]
-                added.append((f_name, kwargs))
-        added = []
-        found = path_folders("tests", folder_class=FileClass, a=3, b=6)
-
-        assert len(found) == len(added)
-        assert len(found) == 1
-        assert found[0].folder_name == "tests"
-        assert found[0].stem == "tests"
-        assert added[0][0] == found[0].folder_name
-        assert added[0][1] == dict(a=3, b=6)
-
-    def test_path_lib(self):
-        found = path_folders("tests", folder_class=pathlib.PurePath)
-
-        assert len(found) == 1
-        assert found[0].name == "tests"
-        assert found[0].stem == "tests"
-
-        found = path_folders("tests", folder_class=pathlib.Path)
-
-        assert len(found) == 1
-        assert found[0].name == "tests"
-        assert found[0].stem == "tests"
-
-
-class TestPathItems:
-    def test_without_placeholders_and_wildcards(self):
-        assert path_items("setup.py") == ["setup.py"]
-        assert path_items("ae/paths.py") == ["ae/paths.py"]
-        assert path_items("tests/test_paths.py") == ["tests/test_paths.py"]
-
-        assert path_items("../ae_paths") == ["../ae_paths"]
-        assert path_items("../ae_paths/setup.py") == ["../ae_paths/setup.py"]
-
-        assert path_items(".") == ["."]
-        assert all(_[0] == "." for _ in path_items("."))
-        assert path_items("./setup.py") == ["./setup.py"]
-
-        assert path_items("ae") == ["ae"]
-        assert "ae/paths.py" not in path_items("ae")        # can also contain __pycache__/paths.cpython-36.pyc
-        assert path_items("ae/paths.py") == ["ae/paths.py"]
-
-        assert path_items("tests") == ["tests"]
-        assert "tests/test_paths.py" not in path_items("tests")
-        assert path_items("tests/test_paths.py") == ["tests/test_paths.py"]
-
-    def test_non_recursive(self):
-        assert path_items("setup.py") == ["setup.py"]
-        assert path_items("ae/paths.py") == ["ae/paths.py"]
-        assert path_items("tests/test_paths.py") == ["tests/test_paths.py"]
-
-        assert path_items("../ae_paths") == ["../ae_paths"]
-        assert path_items("../ae_paths/setup.py") == ["../ae_paths/setup.py"]
-
-        assert path_items(".") == ["."]
-        assert path_items("./setup.py") == ["./setup.py"]
-        assert path_items("./ae/paths.py") == ["./ae/paths.py"]
-
-        assert path_items("ae") == ["ae"]
-        assert path_items("ae/paths.py") == ["ae/paths.py"]
-
-        assert path_items("tests") == ["tests"]
-        assert path_items("tests/test_paths.py") == ["tests/test_paths.py"]
-
-    def test_placeholders(self):
-        assert len(path_items("{cwd}")) == len(path_items("."))
-        assert path_items("{cwd}/ae/paths.py")[0].endswith("/ae_paths/ae/paths.py")
-
-        assert len(path_items("{cwd}/**/*.py")) == 4    # ...setup.py, ...paths.py, ...test_paths.py, ...conftest.py
-        assert all(_.endswith(".py") for _ in path_items("{cwd}/**/*.py"))
-        assert all(_.startswith("/") for _ in path_items("{cwd}/**/*.py"))
-
-    def test_wildcards(self):
-        assert path_items("*.py") == ["setup.py"]
-        assert path_items("**.py") == ["setup.py"]
-
-        assert path_items("set??.py") == ["setup.py"]
-        assert path_items("setup*.py") == ["setup.py"]
-        assert path_items("setup**.py") == ["setup.py"]
-
-        assert "ae/paths.py" in path_items("ae/**")
-        assert path_items("ae/**/*.py") == ["ae/paths.py"]
-        assert path_items("**/pat?s.py") == ["ae/paths.py"]
-
-        assert len(path_items("**/*.py")) == 4
-        assert set(path_items("**/*.py")) == {"setup.py", "ae/paths.py", "tests/test_paths.py", "tests/conftest.py"}
-
-        assert path_items("{cwd}/**/paths.py")[0].endswith("ae_paths/ae/paths.py")
-        assert path_items("{cwd}/**/paths.?y")[0].endswith("ae_paths/ae/paths.py")
-
-        assert len(path_items("{cwd}/**/*paths.py")) == 2
-        assert len(path_items("{cwd}/**/*paths.?y")) == 2
-
-    def test_file_callable(self):
-        def add_file(f_name, **kwargs):
-            """ callable used for the file_class argument of path_files. """
-            added.append((f_name, kwargs))
-            return f_name
-        added = []
-        found = path_items("**.py", creator=add_file, a=1, b=2)
-
-        assert len(found) == len(added)
-        assert len(found) == 1
-        assert found[0] == "setup.py"
-        assert added[0][0] == found[0]
-        assert added[0][1] == dict(a=1, b=2)
-
-    def test_file_class(self):
-        class FileClass:
-            """ class used for the file_class argument of path_files. """
-            def __init__(self, f_name, **kwargs):
-                self.file_name = f_name
-                self.stem = os.path.splitext(f_name)[0]
-                added.append((f_name, kwargs))
-        added = []
-        found = path_items("*.py", creator=FileClass, a=3, b=6)
-
-        assert len(found) == len(added)
-        assert len(found) == 1
-        assert found[0].file_name == "setup.py"
-        assert found[0].stem == "setup"
-        assert added[0][0] == found[0].file_name
-        assert added[0][1] == dict(a=3, b=6)
-
-    def test_path_lib(self):
-        found = path_files("*.py", file_class=pathlib.PurePath)
-
-        assert len(found) == 1
-        assert found[0].name == "setup.py"
-        assert found[0].stem == "setup"
-
-        found = path_items("*.py", creator=pathlib.Path)
-
-        assert len(found) == 1
-        assert found[0].name == "setup.py"
-        assert found[0].stem == "setup"
-
-
-class TestSeriesFileName:
-    def test_series_file_name_basics(self):
-        assert series_file_name("tests/series_tests.tst") == "tests/series_tests 01.tst"
-        assert series_file_name("tests/series_tests.tst", marker='_copy_') == "tests/series_tests_copy_01.tst"
-        assert series_file_name("tests/series_tests.tst", digits=1) == "tests/series_tests 1.tst"
-
-    def test_series_file_name_create(self):
-        file_mask = "tests/series_tests*.tst"
-        try:
-            assert series_file_name("tests/series_tests.tst", create=True) == "tests/series_tests 01.tst"
-            assert series_file_name("tests/series_tests.tst", create=True) == "tests/series_tests 02.tst"
-        finally:
-            for file in glob.glob(file_mask):
-                os.remove(file)
-
-    def test_series_file_name_conflict(self):
-        file_mask = "tests/series_tests*.tst"
-        try:
-            open(file_mask.replace("*", " aaa"), 'w').close()
-            open(file_mask.replace("*", " 04"), 'w').close()
-            assert series_file_name("tests/series_tests.tst", create=True) == "tests/series_tests 03.tst"
-            assert series_file_name("tests/series_tests.tst") == "tests/series_tests 05.tst"
-        finally:
-            for file in glob.glob(file_mask):
-                os.remove(file)
+        assert resources_folder_names(resource_types=[I18N_FOLDER], path_placeholders={"tst": "tst"}) == [I18N_FOLDER]
 
 
 class TestCollector:
@@ -1094,81 +292,94 @@ class TestCollector:
         assert coll.placeholders["app"] == "tst_app_path"
         assert coll.placeholders["main_app_name"] == "tst_app_name"
 
-    def test_collect_simplest(self):
-        coll = Collector()  # item_collector=coll_files is the default argument -> no paths will be collected
-        coll.collect('tests')
-        assert coll.paths == []
-        assert coll.files == []
+    def test_collect_append_duplicates(self):
+        coll = Collector(app='ae', tst=TST_TMP_ROOT)
+        coll.collect("{app}", 'ae', "", append=("{app_name}", "paths" + '.py', "", 'ae'))
+        assert not coll.paths       # 'ae' not in coll.paths because the prefix of ae/paths.py gets found before ""/ae
+        assert coll.files == [TST_MODULE, TST_MODULE]
+        assert not coll.selected
+        assert coll.failed == 0
+        assert not coll.error_message
 
-        coll.collect("tests/*")
-        assert coll.paths == []
-        assert sorted(coll.files) == sorted(tst_files + ["tests/requirements.txt"])
+    def test_collect_appends(self):
+        coll = Collector(item_collector=coll_items, app='ae', tst=TST_TMP_ROOT)
+        coll.collect("{app}", 'ae', "", append=("{app_name}", "paths" + '.py', "", 'ae'))
+        assert coll.paths == ['ae', 'ae', ".", 'ae']
+        assert coll.files == [TST_MODULE, TST_MODULE]
+        assert not coll.selected
+        assert coll.failed == 0
+        assert not coll.error_message
 
-        coll.collect("tests/*.py")
-        coll.collect("tests/*.txt")
-        assert coll.paths == []
-        assert sorted(coll.files) == sorted(2 * (tst_files + ["tests/requirements.txt"]))
+    def test_collect_append_string(self):
+        coll = Collector(app='ae', tst=TST_TMP_ROOT, main_app_name=__file__)
+        coll.collect("{app}", 'ae', "", append="{main_app_name}")
+        assert not coll.paths
+        assert len(coll.files) == 1       # ["{cwd}/tests/test_paths" + '.py']
+        assert coll.files[0].endswith(f"/ae_paths/{TST_TESTS_MODULE}")
+        assert not coll.selected
+        assert coll.failed == 0
+        assert not coll.error_message
 
     def test_collect_append_tests_files(self):
         coll = Collector()
-        coll.collect("", append='tests')
+        coll.collect("", append=TST_TMP_ROOT)
         assert coll.paths == []
 
-        coll.collect('tests', append="*.py")
+        coll.collect(TST_FOLDER_TESTS, append="*" + '.py')
         assert coll.paths == []
-        assert sorted(coll.files) == sorted(tst_files)
+        assert sorted(coll.files) == sorted(TST_TESTS_PY_FILES)
 
-        coll.collect("", append="tests/*.py")
+        coll.collect("", append=os_path_join(TST_FOLDER_TESTS, "*" + '.py'))
         assert coll.paths == []
-        assert sorted(coll.files) == sorted(tst_files * 2)
+        assert sorted(coll.files) == sorted(TST_TESTS_PY_FILES * 2)
 
-        coll.collect('tests')
+        coll.collect(TST_FOLDER_TESTS)
         assert coll.paths == []
-        assert sorted(coll.files) == sorted(tst_files * 2)
+        assert sorted(coll.files) == sorted(TST_TESTS_PY_FILES * 2)
         assert sorted(coll.selected) == []
 
-        coll.collect('tests', append="")
+        coll.collect(TST_FOLDER_TESTS, append="")
         assert coll.paths == []
-        assert sorted(coll.files) == sorted(tst_files * 2)
+        assert sorted(coll.files) == sorted(TST_TESTS_PY_FILES * 2)
         assert sorted(coll.selected) == []
 
-        coll.collect("tests/*.py", append="")
+        coll.collect(os_path_join(TST_FOLDER_TESTS, "*" + '.py'), append="")
         assert coll.paths == []
-        assert sorted(coll.files) == sorted(tst_files * 3)
+        assert sorted(coll.files) == sorted(TST_TESTS_PY_FILES * 3)
         assert sorted(coll.selected) == []
 
         assert coll.failed == 1
         assert coll.error_message
-        assert dict(coll.prefix_failed) == {'tests': 1}
+        assert dict(coll.prefix_failed) == {TST_FOLDER_TESTS: 1}
         assert dict(coll.suffix_failed) == {'': 1}
 
-    def test_collect_append_tests_folders(self):
+    def test_collect_append_in_tests(self):
         coll = Collector(item_collector=coll_folders)
-        coll.collect("", append='tests')
-        assert coll.paths == tst_paths
+        coll.collect("", append=TST_FOLDER_TESTS)
+        assert coll.paths == [TST_FOLDER_TESTS]
 
-        coll.collect('tests', append="*.py")
-        assert coll.paths == tst_paths
+        coll.collect(TST_FOLDER_TESTS, append="*" + '.py')
+        assert coll.paths == [TST_FOLDER_TESTS]
         assert sorted(coll.files) == []
 
-        coll.collect("", append="tests/*.py")
-        assert coll.paths == tst_paths
+        coll.collect("", append=os_path_join(TST_FOLDER_TESTS, "*" + '.py'))
+        assert coll.paths == [TST_FOLDER_TESTS]
         assert sorted(coll.files) == []
 
-        coll.collect('tests')
-        assert coll.paths == tst_paths * 2
+        coll.collect(TST_FOLDER_TESTS)
+        assert coll.paths == [TST_FOLDER_TESTS] * 2
         assert sorted(coll.files) == []
-        assert sorted(coll.selected) == tst_paths
+        assert sorted(coll.selected) == [TST_FOLDER_TESTS]
 
-        coll.collect('tests', append="")
-        assert coll.paths == tst_paths * 3
+        coll.collect(TST_FOLDER_TESTS, append="")
+        assert coll.paths == [TST_FOLDER_TESTS] * 3
         assert sorted(coll.files) == []
-        assert sorted(coll.selected) == tst_paths
+        assert sorted(coll.selected) == [TST_FOLDER_TESTS]
 
-        coll.collect("tests/*.py", append="")
-        assert coll.paths == tst_paths * 3
+        coll.collect(os_path_join(TST_FOLDER_TESTS, "*" + '.py'), append="")
+        assert coll.paths == [TST_FOLDER_TESTS] * 3
         assert sorted(coll.files) == []
-        assert sorted(coll.selected) == tst_paths
+        assert sorted(coll.selected) == [TST_FOLDER_TESTS]
 
         assert coll.failed == 0
         assert not coll.error_message
@@ -1177,129 +388,87 @@ class TestCollector:
 
     def test_collect_append_tests_items(self):
         coll = Collector(item_collector=coll_items)
-        coll.collect("", append='tests')
-        assert coll.paths == tst_paths
+        coll.collect("", append=TST_FOLDER_TESTS)
+        assert coll.paths == [TST_FOLDER_TESTS]
 
-        coll.collect('tests', append="*.py")
-        assert coll.paths == tst_paths
-        assert sorted(coll.files) == sorted(tst_files)
+        coll.collect(TST_FOLDER_TESTS, append="*" + '.py')
+        assert coll.paths == [TST_FOLDER_TESTS]
+        assert sorted(coll.files) == sorted(TST_TESTS_PY_FILES)
 
-        coll.collect('', append="tests/*.py")
-        assert coll.paths == tst_paths
-        assert sorted(coll.files) == sorted(tst_files * 2)
+        coll.collect('', append=os_path_join(TST_FOLDER_TESTS, "*" + '.py'))
+        assert coll.paths == [TST_FOLDER_TESTS]
+        assert sorted(coll.files) == sorted(TST_TESTS_PY_FILES * 2)
 
-        coll.collect('tests')
-        assert coll.paths == tst_paths * 2
-        assert sorted(coll.files) == sorted(tst_files * 2)
-        assert sorted(coll.selected) == tst_paths
+        coll.collect(TST_FOLDER_TESTS)
+        assert coll.paths == [TST_FOLDER_TESTS] * 2
+        assert sorted(coll.files) == sorted(TST_TESTS_PY_FILES * 2)
+        assert sorted(coll.selected) == [TST_FOLDER_TESTS]
 
-        coll.collect('tests', append="")
-        assert coll.paths == tst_paths * 3
-        assert sorted(coll.files) == sorted(tst_files * 2)
-        assert sorted(coll.selected) == tst_paths
+        coll.collect(TST_FOLDER_TESTS, append="")
+        assert coll.paths == [TST_FOLDER_TESTS] * 3
+        assert sorted(coll.files) == sorted(TST_TESTS_PY_FILES * 2)
+        assert sorted(coll.selected) == [TST_FOLDER_TESTS]
 
-        coll.collect("tests/*.py", append="")
-        assert coll.paths == tst_paths * 3
-        assert sorted(coll.files) == sorted(tst_files * 3)
-        assert sorted(coll.selected) == tst_paths
-
-        assert coll.failed == 0
-        assert not coll.error_message
-        assert dict(coll.prefix_failed) == {}
-        assert coll.suffix_failed == {}
-
-    def test_collect_select_tests_files(self):
-        coll = Collector()      # item_collector=coll_files is the default argument
-        coll.collect("", select='tests')
-        assert coll.paths == []
-        assert sorted(coll.selected) == []
-
-        coll.collect('tests', select="*.py")
-        assert coll.paths == []
-        assert sorted(coll.files) == tst_files
-        assert sorted(coll.selected) == tst_files
-
-        coll.collect("", select="tests/*.py")
-        assert coll.paths == []
-        assert sorted(coll.files) == sorted(tst_files * 2)
-        assert sorted(coll.selected) == sorted(tst_files * 2)
-
-        coll.collect('tests', select="")
-        assert coll.paths == []
-        assert sorted(coll.files) == sorted(tst_files * 2)
-        assert sorted(coll.selected) == sorted(tst_files * 2)
-
-        coll.collect("tests/*.py")      # collect select kwarg defaults to ""
-        assert coll.paths == []
-        assert sorted(coll.files) == sorted(tst_files * 3)
-        assert sorted(coll.selected) == sorted(tst_files * 3)
-
-        assert coll.failed == 2
-        assert coll.error_message
-        assert dict(coll.prefix_failed) == {"": 1, 'tests': 1}
-        assert dict(coll.suffix_failed) == {"": 1, 'tests': 1}
-
-    def test_collect_select_tests_folders(self):
-        coll = Collector(item_collector=coll_folders)
-        coll.collect("", select='tests')
-        assert coll.paths == tst_paths
-        assert sorted(coll.selected) == tst_paths
-
-        coll.collect('tests', select="*.py")
-        assert coll.paths == tst_paths
-        assert sorted(coll.files) == []
-        assert sorted(coll.selected) == ['tests']
-
-        coll.collect("", select="tests/*.py")
-        assert coll.paths == tst_paths
-        assert sorted(coll.files) == []
-        assert sorted(coll.selected) == sorted(tst_paths)
-
-        coll.collect('tests', select="")
-        assert coll.paths == tst_paths * 2
-        assert sorted(coll.files) == []
-        assert sorted(coll.selected) == sorted(tst_paths * 2)
-
-        coll.collect("tests/*.py")      # collect select kwarg defaults to ""
-        assert coll.paths == tst_paths * 2
-        assert sorted(coll.files) == []
-        assert sorted(coll.selected) == sorted(tst_paths * 2)
-
-        assert coll.failed == 3
-        assert coll.error_message
-        assert dict(coll.prefix_failed) == {"": 1, "tests/*.py": 1, 'tests': 1}
-        assert dict(coll.suffix_failed) == {"": 1, "tests/*.py": 1, "*.py": 1}
-
-    def test_collect_select_tests_items(self):
-        coll = Collector(item_collector=coll_items)
-        coll.collect("", select='tests')
-        assert coll.paths == tst_paths
-        assert sorted(coll.selected) == tst_paths
-
-        coll.collect('tests', select="*.py")
-        assert coll.paths == tst_paths
-        assert sorted(coll.files) == tst_files
-        assert sorted(coll.selected) == tst_paths + tst_files
-
-        coll.collect("", select="tests/*.py")
-        assert coll.paths == tst_paths
-        assert sorted(coll.files) == sorted(tst_files * 2)
-        assert sorted(coll.selected) == sorted(tst_paths + tst_files * 2)
-
-        coll.collect('tests', select="")
-        assert coll.paths == tst_paths * 2
-        assert sorted(coll.files) == sorted(tst_files * 2)
-        assert sorted(coll.selected) == sorted(tst_paths * 2 + tst_files * 2)
-
-        coll.collect("tests/*.py")      # collect select kwarg defaults to ""
-        assert coll.paths == tst_paths * 2
-        assert sorted(coll.files) == sorted(tst_files * 3)
-        assert sorted(coll.selected) == sorted(tst_paths * 2 + tst_files * 3)
+        coll.collect(os_path_join(TST_FOLDER_TESTS, "*" + '.py'), append="")
+        assert coll.paths == [TST_FOLDER_TESTS] * 3
+        assert sorted(coll.files) == sorted(TST_TESTS_PY_FILES * 3)
+        assert sorted(coll.selected) == [TST_FOLDER_TESTS]
 
         assert coll.failed == 0
         assert not coll.error_message
         assert dict(coll.prefix_failed) == {}
         assert coll.suffix_failed == {}
+
+    def test_collect_deeper_py_files(self):
+        sub_py_files1 = ["sub_dir/tst_sub_file" + '.py']
+        sub_py_files2 = ["sub_dir/sub_dir2/tst_sub_sub_file" + '.py']
+        sub_py_files3 = [TST_MODULE] + TST_TESTS_PY_FILES + sub_py_files1
+
+        try:  # additional temp sub-dirs/-files in project root
+            os.mkdir("sub_dir")
+            for fn in sub_py_files1 + ["sub_dir/tst_sub_wo_extension"]:
+                write_file(fn, f"file_content of sub {fn}")
+            os.mkdir("sub_dir/sub_dir2")
+            for fn in sub_py_files2 + ["sub_dir/sub_dir2/tst_sub_sub_wo_extension"]:
+                write_file(fn, f"file_content of sub sub {fn}")
+
+            coll = Collector()
+            coll.collect("*" + '.py')
+            assert coll.files == [TST_SETUP]
+
+            coll = Collector()
+            coll.collect("", append="*" + '.py')
+            assert coll.files == [TST_SETUP]
+
+            coll = Collector()
+            coll.collect("**", append="*" + '.py')
+            assert sorted(coll.files) == sorted([TST_SETUP] + sub_py_files3 + sub_py_files2)
+
+            coll = Collector()
+            coll.collect("*", append="*" + '.py')
+            assert sorted(coll.files) == sorted(sub_py_files3)
+
+            coll = Collector()
+            coll.collect("*/*", append="*" + '.py')
+            assert sorted(coll.files) == sub_py_files2
+
+            coll = Collector()
+            coll.collect("*/*/*", append="*" + '.py')
+            assert sorted(coll.files) == []
+
+            coll = Collector()
+            coll.collect("**/*", append="*" + '.py')
+            assert sorted(coll.files) == sorted(sub_py_files3 + sub_py_files2)
+
+            coll = Collector()
+            coll.collect("*/**", append="*" + '.py')
+            assert sorted(coll.files) == sorted(sub_py_files3 + sub_py_files2)
+
+            assert coll.failed == 0
+            assert not coll.error_message
+        finally:
+            if os_path_isdir("sub_dir"):
+                shutil.rmtree("sub_dir")
 
     def test_collect_no_args(self):
         coll = Collector()
@@ -1312,12 +481,12 @@ class TestCollector:
         assert len(coll.prefix_failed) == 0
         assert len(coll.suffix_failed) == 0
 
-    def test_collect_nothing_found(self):
+    def test_collect_nothing_findable(self):
         coll = Collector(app="tst_app_path")
         prefixes = ("{cwd}/../..", "{app}", "{usr}", "{usr}/{app_name}", "{cwd}/..", "{cwd}", )
-        coll.collect(*prefixes, append=(".app_env" + CFG_EXT, ".sys_env" + CFG_EXT, ".sys_envTEST" + CFG_EXT,))
+        coll.collect(*prefixes, append=("not : valid fil nam", "not_______existent_ tst file name.ext", ))
         assert not coll.paths
-        # global .app_env.cfg could be found on your local machine - therefore, skip: assert not coll.files
+        assert not coll.files
         assert not coll.selected
         assert coll.failed == 0
         assert not coll.error_message
@@ -1325,100 +494,8 @@ class TestCollector:
         assert len(coll.prefix_failed) == 0
         assert len(coll.suffix_failed) == 0
 
-    def test_collect_appends(self):
-        coll = Collector(item_collector=coll_items, app="ae", tst="tests")
-        coll.collect("{app}", "ae", "", append=("{app_name}", "paths.py", "", "ae"))
-        assert coll.paths == ['ae', 'ae', ".", 'ae']
-        assert coll.files == ["ae/paths.py", "ae/paths.py"]
-        assert not coll.selected
-        assert coll.failed == 0
-        assert not coll.error_message
-
-    def test_collect_append_duplicates(self):
-        coll = Collector(app="ae", tst="tests")
-        coll.collect("{app}", "ae", "", append=("{app_name}", "paths.py", "", "ae"))
-        assert not coll.paths       # 'ae' not in coll.paths because the prefix of ae/paths.py gets found before ""/ae
-        assert coll.files == ["ae/paths.py", "ae/paths.py"]
-        assert not coll.selected
-        assert coll.failed == 0
-        assert not coll.error_message
-
-    def test_collect_append_string(self):
-        coll = Collector(app="ae", tst="tests", main_app_name=__file__)
-        coll.collect("{app}", "ae", "", append="{main_app_name}")
-        assert not coll.paths
-        assert len(coll.files) == 1       # ["{cwd}/tests/test_paths.py"]
-        assert coll.files[0].endswith("/ae_paths/tests/test_paths.py")
-        assert not coll.selected
-        assert coll.failed == 0
-        assert not coll.error_message
-
-    def test_collect_selects(self):
-        coll = Collector(item_collector=coll_items, app="ae", tst="tests")
-        coll.collect("{cwd}", "{app}", "ae",
-                     select=(".*", "README.md", "tests/test_paths.py", "", "ae", ))
-
-        assert len(coll.paths) >= 4   # ["{cwd}", "{cwd}/ae", 'ae', 'ae'] + localMachFolders .git/.pylint/.mypy_cache/..
-        assert sum(1 for _ in coll.paths if _ == os.getcwd()) == 1
-        assert sum(1 for _ in coll.paths if _ == os.path.join(os.getcwd(), 'ae')) == 1
-        assert sum(1 for _ in coll.paths if _ == 'ae') == 2
-
-        assert 4 <= len(coll.files) <= 7    # .commit_msg.txt,d .python-version and .coverage are missing on CI host
-        # ["{cwd}/.gitignore", "{cwd}/.commit_msg.txt", "{cwd}/.python-version", "{cwd}/.gitlab-ci.yml",
-        #  "{cwd}/README.md", "{cwd}/tests/test_paths.py"]
-        assert all(_.startswith(os.getcwd()) for _ in coll.files)
-        files = [os.path.basename(_) for _ in coll.files]
-        assert '.gitignore' in files
-        assert '.gitlab-ci.yml' in files
-        assert 'README.md' in files
-        assert 'test_paths.py' in files
-
-        assert all(_ in coll.files or _ in coll.paths for _ in coll.selected)
-        assert 0 < coll.failed < len(coll.paths) + len(coll.files)
-        assert coll.error_message
-
-    def test_collect_select_failures(self):
-        coll = Collector(cw=os.getcwd(), app="ae", tst="tests")
-        coll.collect("{cw}", "{app}", "ae", select=".*")
-        assert not coll.paths
-        assert 2 <= len(coll.files) <= 5
-        # ["{cw}/.gitignore", "{cw}/.commit_msg.txt", "{cw}/.python-version", "{cw}/.gitlab-ci.yml", "{cw}/.coverage"]
-        assert all(_.startswith(os.getcwd()) for _ in coll.files)
-        files = [os.path.basename(_) for _ in coll.files]
-        assert '.gitignore' in files
-        assert '.gitlab-ci.yml' in files
-        assert coll.selected == coll.files
-        assert coll.failed == 2
-        assert coll.prefix_failed == {"{app}": 1, 'ae': 1}
-        assert coll.suffix_failed == {".*": 2}
-        assert coll.error_message
-
-    def test_collect_select_string(self):
-        coll = Collector(app="ae", tst="tests")
-        coll.collect("{cwd}", "{app}", "ae", select=".*")
-        assert not coll.paths
-        assert 2 <= len(coll.files) <= 5
-        # ["{cwd}/.gitignore", "{cwd}/.gitlab-ci.yml"] only .commit_msg.txt|.python-version|.coverage are not at CI host
-        assert all(_.startswith(os.getcwd()) for _ in coll.files)
-        files = [os.path.basename(_) for _ in coll.files]
-        assert '.gitignore' in files
-        assert '.gitlab-ci.yml' in files
-        assert coll.selected == coll.files
-        assert 0 < coll.failed <= len(coll.paths) + len(coll.files)  # failed == 2 from {app}.*|ae.* == ae.*|ae.*
-        assert coll.error_message
-
-    def test_collect_prefixes_only(self):
-        coll = Collector(item_collector=coll_items, app="ae", tst="tests")
-        coll.collect("{app}", "{usr}", "tests/test_paths.py")
-        assert 1 <= len(coll.paths) <= 2   # ['ae', "/home/andi/.config"], CI: [..., "/builds/ae-group/ae_paths..."]
-        assert 'ae' in coll.paths
-        assert coll.files == ["tests/test_paths.py"]
-        assert coll.selected == coll.paths + coll.files
-        assert coll.failed == 0
-        assert not coll.error_message
-
     def test_collect_prefixes_as_relative_and_duplicate_absolute_folder_paths(self):
-        coll = Collector(item_collector=coll_folders, app="ae", usr="ae")
+        coll = Collector(item_collector=coll_folders, app='ae', usr='ae')
         coll.collect('{app}', '{cwd}', '{usr}')
         # assert coll.paths == ['ae', "/home/andi/src/ae_paths", 'ae'] != CI: ['ae', "/builds/ae-group/ae_paths", 'ae']
         assert coll.paths == ['ae', normalize('{cwd}'), 'ae']
@@ -1427,41 +504,221 @@ class TestCollector:
         assert coll.failed == 0
         assert not coll.error_message
 
-    def test_wildcard_recursive(self, test_sub_files):
-        coll = Collector()
-        coll.collect("*.py")
-        assert coll.files == ['setup.py']
+    def test_collect_prefixes_only(self):
+        coll = Collector(item_collector=coll_items, app='ae', tst=TST_TMP_ROOT)
+        coll.collect("{app}", "{usr}", TST_TESTS_MODULE)
+        assert 1 <= len(coll.paths) <= 2   # ['ae', "/home/andi/.config"], CI: [..., "/builds/ae-group/ae_paths..."]
+        assert 'ae' in coll.paths
+        assert coll.files == [TST_TESTS_MODULE]
+        assert coll.selected == coll.paths + coll.files
+        assert coll.failed == 0
+        assert not coll.error_message
 
-        coll = Collector()
-        coll.collect("", append="*.py")
-        assert coll.files == ['setup.py']
+    def test_collect_select_failures(self):
+        coll = Collector(cw=os.getcwd(), app='ae', tst=TST_TMP_ROOT)
+        coll.collect("{cw}", "{app}", 'ae', select=".*")
+        assert not coll.paths
+        assert 2 <= len(coll.files) <= 5
+        # ["{cw}/.gitignore", "{cw}/.commit_msg.txt", "{cw}/.python-version", "{cw}/.gitlab-ci.yml", "{cw}/.coverage"]
+        assert all(_.startswith(os.getcwd()) for _ in coll.files)
+        files = [os_path_basename(_) for _ in coll.files]
+        assert '.gitignore' in files
+        assert '.gitlab-ci.yml' in files
+        assert coll.selected == coll.files
+        assert coll.failed == 2
+        assert coll.prefix_failed == {"{app}": 1, 'ae': 1}
+        assert coll.suffix_failed == {".*": 2}
+        assert coll.error_message
 
-        coll = Collector()
-        coll.collect("**", append="*.py")
-        assert sorted(coll.files) == tst_all_py_files
+    def test_collect_selects(self):
+        coll = Collector(item_collector=coll_items, app='ae', tst=TST_TMP_ROOT)
+        coll.collect("{cwd}", "{app}", 'ae',
+                     select=(".*", "README.md", TST_TESTS_MODULE, "", 'ae',))
 
-        coll = Collector()
-        coll.collect("*", append="*.py")
-        assert sorted(coll.files) == sorted(mod_files + tst_files)
+        assert len(coll.paths) >= 4   # ["{cwd}", "{cwd}/ae", 'ae', 'ae'] + localMachFolders .git/.pylint/.mypy_cache/..
+        assert sum(1 for _ in coll.paths if _ == os.getcwd()) == 1
+        assert sum(1 for _ in coll.paths if _ == os_path_join(os.getcwd(), 'ae')) == 1
+        assert sum(1 for _ in coll.paths if _ == 'ae') == 2
 
-        coll = Collector()
-        coll.collect("*/*", append="*.py")
-        assert sorted(coll.files) == tst_sub_py_files1
+        assert 4 <= len(coll.files) <= 7    # .commit_msg.txt,d .python-version and .coverage are missing on CI host
+        # ["{cwd}/.gitignore", "{cwd}/.commit_msg.txt", "{cwd}/.python-version", "{cwd}/.gitlab-ci.yml",
+        #  "{cwd}/README.md", "{cwd}/tests/test_paths" + '.py']
+        assert all(_.startswith(os.getcwd()) for _ in coll.files)
+        files = [os_path_basename(_) for _ in coll.files]
+        assert '.gitignore' in files
+        assert '.gitlab-ci.yml' in files
+        assert 'README.md' in files
+        assert 'test_paths' + '.py' in files
 
-        coll = Collector()
-        coll.collect("*/*/*", append="*.py")
-        assert sorted(coll.files) == tst_sub_py_files2
+        assert all(_ in coll.files or _ in coll.paths for _ in coll.selected)
+        assert 0 < coll.failed < len(coll.paths) + len(coll.files)
+        assert coll.error_message
 
-        coll = Collector()
-        coll.collect("**/*", append="*.py")
-        assert sorted(coll.files) == sorted(mod_files + tst_files + tst_sub_py_files)
+    def test_collect_select_string(self):
+        coll = Collector(app='ae', tst=TST_TMP_ROOT)
+        coll.collect("{cwd}", "{app}", 'ae', select=".*")
+        assert not coll.paths
+        assert 2 <= len(coll.files) <= 5
+        # ["{cwd}/.gitignore", "{cwd}/.gitlab-ci.yml"] only .commit_msg.txt|.python-version|.coverage are not at CI host
+        assert all(_.startswith(os.getcwd()) for _ in coll.files)
+        files = [os_path_basename(_) for _ in coll.files]
+        assert '.gitignore' in files
+        assert '.gitlab-ci.yml' in files
+        assert coll.selected == coll.files
+        assert 0 < coll.failed <= len(coll.paths) + len(coll.files)  # failed == 2 from {app}.*|ae.* == ae.*|ae.*
+        assert coll.error_message
 
-        coll = Collector()
-        coll.collect("*/**", append="*.py")
-        assert sorted(coll.files) == sorted(mod_files + tst_files + tst_sub_py_files)
+    def test_collect_select_tests_files(self):
+        coll = Collector()      # item_collector=coll_files is the default argument
+        coll.collect("", select=TST_FOLDER_TESTS)
+        assert coll.paths == []
+        assert sorted(coll.selected) == []
+
+        coll.collect(TST_FOLDER_TESTS, select="*" + '.py')
+        assert coll.paths == []
+        assert sorted(coll.files) == TST_TESTS_PY_FILES
+        assert sorted(coll.selected) == TST_TESTS_PY_FILES
+
+        coll.collect("", select=os_path_join(TST_FOLDER_TESTS, "*" + '.py'))
+        assert coll.paths == []
+        assert sorted(coll.files) == sorted(TST_TESTS_PY_FILES * 2)
+        assert sorted(coll.selected) == sorted(TST_TESTS_PY_FILES * 2)
+
+        coll.collect(TST_FOLDER_TESTS, select="")
+        assert coll.paths == []
+        assert sorted(coll.files) == sorted(TST_TESTS_PY_FILES * 2)
+        assert sorted(coll.selected) == sorted(TST_TESTS_PY_FILES * 2)
+
+        coll.collect(os_path_join(TST_FOLDER_TESTS, "*" + '.py'))      # collect select kwarg defaults to ""
+        assert coll.paths == []
+        assert sorted(coll.files) == sorted(TST_TESTS_PY_FILES * 3)
+        assert sorted(coll.selected) == sorted(TST_TESTS_PY_FILES * 3)
+
+        assert coll.failed == 2
+        assert coll.error_message
+        assert dict(coll.prefix_failed) == {"": 1, TST_FOLDER_TESTS: 1}
+        assert dict(coll.suffix_failed) == {"": 1, TST_FOLDER_TESTS: 1}
+
+    def test_collect_select_in_tests(self):
+        coll = Collector(item_collector=coll_folders)
+        coll.collect("", select=TST_FOLDER_TESTS)
+        assert coll.paths == [TST_FOLDER_TESTS]
+        assert sorted(coll.selected) == [TST_FOLDER_TESTS]
+
+        coll.collect(TST_FOLDER_TESTS, select="*" + '.py')
+        assert coll.paths == [TST_FOLDER_TESTS]
+        assert sorted(coll.files) == []
+        assert sorted(coll.selected) == [TST_FOLDER_TESTS]
+
+        coll.collect("", select=os_path_join(TST_FOLDER_TESTS, "*" + '.py'))
+        assert coll.paths == [TST_FOLDER_TESTS]
+        assert sorted(coll.files) == []
+        assert sorted(coll.selected) == sorted([TST_FOLDER_TESTS])
+
+        coll.collect(TST_FOLDER_TESTS, select="")
+        assert coll.paths == [TST_FOLDER_TESTS] * 2
+        assert sorted(coll.files) == []
+        assert sorted(coll.selected) == sorted([TST_FOLDER_TESTS] * 2)
+
+        coll.collect(os_path_join(TST_FOLDER_TESTS, "*" + '.py'))      # collect select kwarg defaults to ""
+        assert coll.paths == [TST_FOLDER_TESTS] * 2
+        assert sorted(coll.files) == []
+        assert sorted(coll.selected) == sorted([TST_FOLDER_TESTS] * 2)
+
+        assert coll.failed == 3
+        assert coll.error_message
+        assert dict(coll.prefix_failed) == {"": 1, os_path_join(TST_FOLDER_TESTS, "*" + '.py'): 1, TST_FOLDER_TESTS: 1}
+        assert dict(coll.suffix_failed) == {"": 1, os_path_join(TST_FOLDER_TESTS, "*" + '.py'): 1, "*" + '.py': 1}
+
+    def test_collect_select_tests_items(self):
+        coll = Collector(item_collector=coll_items)
+        coll.collect("", select=TST_FOLDER_TESTS)
+        assert coll.paths == [TST_FOLDER_TESTS]
+        assert sorted(coll.selected) == [TST_FOLDER_TESTS]
+
+        coll.collect(TST_FOLDER_TESTS, select="*" + '.py')
+        assert coll.paths == [TST_FOLDER_TESTS]
+        assert sorted(coll.files) == TST_TESTS_PY_FILES
+        assert sorted(coll.selected) == [TST_FOLDER_TESTS] + TST_TESTS_PY_FILES
+
+        coll.collect("", select=os_path_join(TST_FOLDER_TESTS, "*" + '.py'))
+        assert coll.paths == [TST_FOLDER_TESTS]
+        assert sorted(coll.files) == sorted(TST_TESTS_PY_FILES * 2)
+        assert sorted(coll.selected) == sorted([TST_FOLDER_TESTS] + TST_TESTS_PY_FILES * 2)
+
+        coll.collect(TST_FOLDER_TESTS, select="")
+        assert coll.paths == [TST_FOLDER_TESTS] * 2
+        assert sorted(coll.files) == sorted(TST_TESTS_PY_FILES * 2)
+        assert sorted(coll.selected) == sorted([TST_FOLDER_TESTS] * 2 + TST_TESTS_PY_FILES * 2)
+
+        coll.collect(os_path_join(TST_FOLDER_TESTS, "*" + '.py'))      # collect select kwarg defaults to ""
+        assert coll.paths == [TST_FOLDER_TESTS] * 2
+        assert sorted(coll.files) == sorted(TST_TESTS_PY_FILES * 3)
+        assert sorted(coll.selected) == sorted([TST_FOLDER_TESTS] * 2 + TST_TESTS_PY_FILES * 3)
 
         assert coll.failed == 0
         assert not coll.error_message
+        assert dict(coll.prefix_failed) == {}
+        assert coll.suffix_failed == {}
+
+    def test_collect_simplest(self):
+        coll = Collector()  # item_collector=coll_files is the default argument -> no paths will be collected
+        coll.collect(TST_TMP_ROOT)
+        assert coll.paths == []
+        assert coll.files == []
+
+        coll.collect(os_path_join(TST_FOLDER_TESTS, "*"))
+        assert coll.paths == []
+        assert sorted(coll.files) == sorted(TST_TESTS_PY_FILES + [TST_TESTS_REQS_PATH])
+
+        coll.collect(os_path_join(TST_FOLDER_TESTS, "*" + '.py'))
+        coll.collect(os_path_join(TST_FOLDER_TESTS, "*.txt"))
+        assert coll.paths == []
+        assert sorted(coll.files) == sorted(2 * (TST_TESTS_PY_FILES + [TST_TESTS_REQS_PATH]))
+
+
+class TestCopyFiles:
+    def test_blocked_copy_to_parent_dir(self, tst_move_files):
+        src_dir = os_path_dirname(tst_move_files[0])
+        dst_dir = os_path_join(src_dir, "..")
+        dst_block_file = os_path_join(dst_dir, TST_INI_FILE)
+        write_file_text(TST_OLD_CONTENT, dst_block_file)
+        assert os_path_isfile(dst_block_file)
+        for src_file_path in tst_move_files:
+            assert os_path_isfile(src_file_path)
+            dst_file = os_path_join(dst_dir, os_path_relpath(src_file_path, src_dir))
+            assert dst_file == dst_block_file or not os_path_isfile(dst_file)
+        tst_overwrite = (TST_OVER_FOLDER_NAME in src_dir)
+
+        copy_files(src_dir, dst_dir, overwrite=tst_overwrite)
+
+        if not tst_overwrite:
+            assert os_path_isfile(tst_move_files[0])
+            assert read_file_text(tst_move_files[0]) == TST_FILE_CONTENT
+            dst_file = os_path_join(dst_dir, os_path_relpath(tst_move_files[0], src_dir))
+            assert os_path_isfile(dst_file)
+            assert read_file_text(dst_file) == TST_OLD_CONTENT
+
+            assert os_path_isfile(tst_move_files[1])
+            dst_file = os_path_join(dst_dir, os_path_relpath(tst_move_files[1], src_dir))
+            assert os_path_isfile(dst_file)
+            assert read_file_text(dst_file) == TST_NEW_CONTENT
+
+    def test_copy_to_parent_dir(self, tst_move_files):
+        src_dir = os_path_dirname(tst_move_files[0])
+        dst_dir = os_path_join(src_dir, "..")
+        for src_file_path in tst_move_files:
+            assert os_path_isfile(src_file_path)
+            assert not os_path_isfile(os_path_join(dst_dir, os_path_relpath(src_file_path, src_dir)))
+            assert not os_path_isdir(os_path_join(dst_dir, os_path_relpath(src_file_path, src_dir)))
+        tst_overwrite = (TST_OVER_FOLDER_NAME in src_dir)
+
+        copy_files(src_dir, dst_dir, overwrite=tst_overwrite)
+
+        if not tst_overwrite:
+            for src_file_path in tst_move_files:
+                assert os_path_isfile(src_file_path)
+                assert os_path_isfile(os_path_join(dst_dir, os_path_relpath(src_file_path, src_dir)))
 
 
 class TestFilesRegister:
@@ -1517,6 +774,38 @@ class TestFilesRegister:
         fr.add_files(tuple(files2), first_index=-4)
         assert fr['tst'] == (files1 + files2)[::-1]
 
+    def test_add_path_init(self, tst_prop_files):
+        wop, wip = tst_prop_files
+        fr = FilesRegister(os_path_join(TST_PROP_ROOT, "**"))
+        assert len(fr) == 1
+        assert TST_PROP_FILE in fr
+        files = fr[TST_PROP_FILE]
+        assert len(files) == 2
+        assert all(_.path in (wop, wip) for _ in files)
+        assert all(_.stem == TST_PROP_FILE for _ in files)
+        assert all(_.ext == TST_PROP_EXT for _ in files)
+        assert all(_.properties in ({}, TST_PROPERTIES) for _ in files)
+
+    def test_add_path_redirect(self, tst_prop_files):
+        wop, wip = tst_prop_files
+        fri = FilesRegister(os_path_join(TST_PROP_ROOT, "**"))
+        fr = FilesRegister()
+        assert len(fr.add_paths(os_path_join(TST_PROP_ROOT, "**"))) == len(tst_prop_files)
+        assert len(fri) == len(fr)
+        assert TST_PROP_FILE in fr
+        files = fr[TST_PROP_FILE]
+        assert len(files) == len(tst_prop_files)
+        assert all(_.path in (wop, wip) for _ in files)
+        assert all(_.stem == TST_PROP_FILE for _ in files)
+        assert all(_.ext == TST_PROP_EXT for _ in files)
+        assert all(_.properties in ({}, TST_PROPERTIES) for _ in files)
+
+        old_len = len(fr)
+        assert 'test_files' not in fr
+        fr.add_file(os_path_join(TST_TMP_ROOT, 'test_files' + '.py'))
+        assert old_len < len(fr)
+        assert 'test_files' in fr
+
     def test_add_register(self):
         fr = FilesRegister()
         fr.add_file("test.xx")
@@ -1534,109 +823,82 @@ class TestFilesRegister:
         assert fr.find_file('test3')
         assert fr.find_file('test6')
 
-    def test_add_path_init(self, files_to_test):
-        wop, wip = files_to_test
-        fr = FilesRegister(os.path.join(file_root, "**"))
+    def test_cache_file_class(self, tst_prop_files):
+        wop, wip = tst_prop_files
+        fr = FilesRegister(os_path_join(TST_PROP_ROOT, "**"), file_class=CachedFile, object_loader=tst_file_loader)
         assert len(fr) == 1
-        assert file_name in fr
-        files = fr[file_name]
+        assert TST_PROP_FILE in fr
+        files = fr[TST_PROP_FILE]
         assert len(files) == 2
         assert all(_.path in (wop, wip) for _ in files)
-        assert all(_.stem == file_name for _ in files)
-        assert all(_.ext == file_ext for _ in files)
-        assert all(_.properties in ({}, file_properties) for _ in files)
-
-    def test_add_path_redirect(self, files_to_test):
-        wop, wip = files_to_test
-        fri = FilesRegister(os.path.join(file_root, "**"))
-        fr = FilesRegister()
-        assert len(fr.add_paths(os.path.join(file_root, "**"))) == len(files_to_test)
-        assert len(fri) == len(fr)
-        assert file_name in fr
-        files = fr[file_name]
-        assert len(files) == len(files_to_test)
-        assert all(_.path in (wop, wip) for _ in files)
-        assert all(_.stem == file_name for _ in files)
-        assert all(_.ext == file_ext for _ in files)
-        assert all(_.properties in ({}, file_properties) for _ in files)
-
-        old_len = len(fr)
-        assert 'test_files' not in fr
-        fr.add_file("tests/test_files.py")
-        assert old_len < len(fr)
-        assert 'test_files' in fr
-
-    def test_cache_file_class(self, files_to_test):
-        wop, wip = files_to_test
-        fr = FilesRegister(os.path.join(file_root, "**"), file_class=CachedFile, object_loader=file_loader_mock_func)
-        assert len(fr) == 1
-        assert file_name in fr
-        files = fr[file_name]
-        assert len(files) == 2
-        assert all(_.path in (wop, wip) for _ in files)
-        assert all(_.stem == file_name for _ in files)
-        assert all(_.ext == file_ext for _ in files)
-        assert all(_.properties in ({}, file_properties) for _ in files)
+        assert all(_.stem == TST_PROP_FILE for _ in files)
+        assert all(_.ext == TST_PROP_EXT for _ in files)
+        assert all(_.properties in ({}, TST_PROPERTIES) for _ in files)
 
         assert all(isinstance(_, CachedFile) for _ in files)
 
-    def test_call_find_file_redirect(self, files_to_test):
-        assert file_name in files_to_test[1]
-        fr = FilesRegister(file_root)
-        assert fr(file_name, properties=file_properties) == fr.find_file(file_name, properties=file_properties)
+    def test_call_find_file_redirect(self, tst_prop_files):
+        assert TST_PROP_FILE in tst_prop_files[1]
+        fr = FilesRegister(TST_PROP_ROOT)
+        assert fr(TST_PROP_FILE, properties=TST_PROPERTIES) == fr.find_file(TST_PROP_FILE, properties=TST_PROPERTIES)
 
-    def test_find_file_by_name(self, files_to_test):
-        assert file_name in files_to_test[1]
-        fr = FilesRegister(os.path.join(file_root, "**"))
+    def test_find_file_by_name(self, tst_prop_files):
+        assert TST_PROP_FILE in tst_prop_files[1]
+        fr = FilesRegister(os_path_join(TST_PROP_ROOT, "**"))
         assert isinstance(fr, FilesRegister)
-        ff = fr.find_file(file_name)
+        ff = fr.find_file(TST_PROP_FILE)
         assert isinstance(ff, RegisteredFile)
-        assert ff.stem == file_name
+        assert ff.stem == TST_PROP_FILE
 
-    def test_find_file_by_properties(self, files_to_test):
-        assert file_name in files_to_test[1]
-        fr = FilesRegister(os.path.join(file_root, "**"))
-        ff = fr.find_file(file_name, properties=file_properties)
+    def test_find_file_by_properties(self, tst_prop_files):
+        assert TST_PROP_FILE in tst_prop_files[1]
+        fr = FilesRegister(os_path_join(TST_PROP_ROOT, "**"))
+        ff = fr.find_file(TST_PROP_FILE, properties=TST_PROPERTIES)
         assert isinstance(ff, RegisteredFile)
-        assert ff.stem == file_name
-        assert ff.properties == file_properties
+        assert ff.stem == TST_PROP_FILE
+        assert ff.properties == TST_PROPERTIES
 
-    def test_find_file_by_property_matcher(self, files_to_test):
-        assert file_name in files_to_test[1]
-        fr = FilesRegister(os.path.join(file_root, "**"))
+    def test_find_file_by_property_matcher(self, tst_prop_files):
+        assert TST_PROP_FILE in tst_prop_files[1]
+        fr = FilesRegister(os_path_join(TST_PROP_ROOT, "**"))
         # noinspection PyTypeChecker
-        ff = fr.find_file(file_name, property_matcher=property_matcher_mock)
+        ff = fr.find_file(TST_PROP_FILE, property_matcher=tst_property_matcher)
         assert isinstance(ff, RegisteredFile)
-        assert ff.stem == file_name
-        assert ff.properties == file_properties
+        assert ff.stem == TST_PROP_FILE
+        assert ff.properties == TST_PROPERTIES
 
-    def test_find_file_by_property_matcher_and_file_sorter(self, files_to_test):
-        assert file_name in files_to_test[1]
-        fr = FilesRegister(os.path.join(file_root, "**"))
+    def test_find_file_by_property_matcher_and_file_sorter(self, tst_prop_files):
+        assert TST_PROP_FILE in tst_prop_files[1]
+        fr = FilesRegister(os_path_join(TST_PROP_ROOT, "**"))
         # noinspection PyTypeChecker
-        ff = fr.find_file(file_name, properties=file_properties, file_sorter=file_sorter_mock)
+        ff = fr.find_file(TST_PROP_FILE, properties=TST_PROPERTIES, file_sorter=tst_file_sorter)
         assert isinstance(ff, RegisteredFile)
-        assert ff.stem == file_name
-        assert ff.properties == file_properties
+        assert ff.stem == TST_PROP_FILE
+        assert ff.properties == TST_PROPERTIES
 
-    def test_find_file_by_file_sorter(self, files_to_test):
-        assert file_name in files_to_test[1]
-        fr = FilesRegister(os.path.join(file_root, "**"))
+    def test_find_file_by_sorter(self, tst_prop_files):
+        assert TST_PROP_FILE in tst_prop_files[1]
+        fr = FilesRegister(os_path_join(TST_PROP_ROOT, "**"))
         # noinspection PyTypeChecker
-        ff = fr.find_file(file_name, file_sorter=file_sorter_mock)
+        ff = fr.find_file(TST_PROP_FILE, file_sorter=tst_file_sorter)
         assert isinstance(ff, RegisteredFile)
-        assert ff.stem == file_name
+        assert ff.stem == TST_PROP_FILE
         assert ff.properties == {}      # finds the one without properties because int-default==0
-
-    def test_find_file_with_default_property_matcher(self):
-        # noinspection PyTypeChecker
-        fr = FilesRegister(property_matcher=property_matcher_mock)
-        assert fr.property_watcher is property_matcher_mock
 
     def test_find_file_with_default_file_sorter(self):
         # noinspection PyTypeChecker
-        fr = FilesRegister(file_sorter=file_sorter_mock)
-        assert fr.file_sorter is file_sorter_mock
+        fr = FilesRegister(file_sorter=tst_file_sorter)
+        assert fr.file_sorter is tst_file_sorter
+
+    def test_find_file_with_default_property_matcher(self):
+        # noinspection PyTypeChecker
+        fr = FilesRegister(property_matcher=tst_property_matcher)
+        assert fr.property_watcher is tst_property_matcher
+
+    def test_init_file_sorter(self):
+        # noinspection PyTypeChecker
+        fr = FilesRegister(file_sorter=tst_file_sorter)
+        assert fr.file_sorter is tst_file_sorter
 
     def test_init_min(self):
         fr = FilesRegister()
@@ -1647,13 +909,8 @@ class TestFilesRegister:
 
     def test_init_property_matcher(self):
         # noinspection PyTypeChecker
-        fr = FilesRegister(property_matcher=property_matcher_mock)
-        assert fr.property_watcher is property_matcher_mock
-
-    def test_init_file_sorter(self):
-        # noinspection PyTypeChecker
-        fr = FilesRegister(file_sorter=file_sorter_mock)
-        assert fr.file_sorter is file_sorter_mock
+        fr = FilesRegister(property_matcher=tst_property_matcher)
+        assert fr.property_watcher is tst_property_matcher
 
     def test_reclassify(self):
         fr = FilesRegister()
@@ -1670,3 +927,798 @@ class TestFilesRegister:
         assert all(isinstance(file, pathlib.Path) for file in fr['ttt'])
         fr.reclassify(file_class=pathlib.PurePath)
         assert all(isinstance(file, pathlib.PurePath) for file in fr['ttt'])
+
+
+class TestOtherHelpers:
+    def test_path_join(self):
+        assert path_join("") == os_path_join("")
+        assert path_join('part') == os_path_join('part')
+        assert path_join('part', 'part2') == os_path_join('part', 'part2')
+        assert path_join('part', '', 'part2') == os_path_join('part', '', 'part2')
+        assert path_join('part', ".", 'part2') == os_path_join('part', ".", 'part2')
+        assert path_join('part', "..", 'part2') == os_path_join('part', "..", 'part2')
+        assert path_join('part', "/part2") == os_path_join('part', "/part2")
+        assert path_join('part', "/", 'part2') == os_path_join('part', "/", 'part2')
+        assert path_join('part', "//", 'part2') == os_path_join('part', "//", 'part2')
+        assert path_join("/part", 'part2') == os_path_join("/part", 'part2')
+        assert path_join('', 'part2') == os_path_join('', 'part2')
+
+        assert path_join('part', '') == 'part'  # os_path_join() returns "part/" in this case
+        assert path_join('part', '') != os_path_join('part', '')
+
+    def test_path_match(self):
+        assert path_match('c' + '.py', "?" + '.py')
+        assert path_match('c' + '.py', "?.p?")
+        assert not path_match('c' + '.py', "??.p?")
+        assert not path_match('c' + '.py', "?.p??")
+
+        assert path_match('c' + '.py', "*")
+        assert path_match('c' + '.py', "*" + '.py')
+        assert path_match('c' + '.py', "c" + '.py')
+
+        assert path_match('c' + '.py', "**/*" + '.py')
+        assert path_match("a/b/c" + '.py', "**/*" + '.py')
+        assert path_match("/a/b/c" + '.py', "**/*" + '.py')
+        assert path_match("a/b/c" + '.py', "a/**")
+        assert path_match("/a/b/c" + '.py', "/a/**")
+        assert path_match("a/b/c" + '.py', "a/**/b/**")
+        assert path_match("/a/b/c" + '.py', "/a/**/b/**")
+        assert path_match("a/b/c" + '.py', "a/**/b/**/c.*")
+        assert path_match("/a/b/c" + '.py', "/a/**/b/**/c.*")
+        assert not path_match("a/b/c" + '.py', "a/*")
+        assert not path_match("/a/b/c" + '.py', "a/*")
+        assert not path_match("a/b/c" + '.py', "a**/*" + '.py')
+        assert not path_match("/a/b/c" + '.py', "a**/*" + '.py')
+        assert not path_match("a/b/c" + '.py', "/a/**")
+        assert not path_match("/a/b/c" + '.py', "a/**")
+
+        assert path_match('abc' + '.py', "[axy]bc" + '.py')
+        assert path_match('abc' + '.py', "ab[cxy]" + '.py')
+        assert path_match('abc' + '.py', "ab[!dxy]" + '.py')
+
+    def test_path_match_py313(self):
+        with (patch('ae.paths.sys.version_info', (3, 13)),
+              patch('ae.paths.PurePath') as mock_full_match):
+            assert path_match('c' + '.py', "?" + '.py')
+
+        mock_full_match.assert_called_once_with('c' + '.py')
+        mock_full_match.return_value.full_match.assert_called_once_with('?' + '.py')
+
+    def test_path_name(self):
+        assert path_name("") == ""
+        assert path_name("/not/a/existing/test/path") == ""
+        assert path_name(".") == ""
+
+        duplicates1 = ('cwd', 'application')
+        duplicates2 = ('doc', 'documents')
+        for name, path in PATH_PLACEHOLDERS.items():
+            if path_name(path) == 'external_storage':
+                assert name == 'external_storage' or path.endswith(name)
+            else:
+                names = duplicates1 if name in duplicates1 else duplicates2 if name in duplicates2 else (name,)
+                assert path_name(path) in names
+
+    def test_paths_match(self):
+        assert list(paths_match(['c' + '.py'], ["**/*" + '.py'])) == ['c' + '.py']
+        assert list(paths_match(['a' + '.py', "a/b/c.d"], ["**/*" + '.py'])) == ['a' + '.py']
+        assert set(paths_match(['a' + '.py', "a/b/c" + '.py'], ["**/*" + '.py'])) == {'a' + '.py', "a/b/c" + '.py'}
+        assert list(paths_match(['c' + '.py'], ["**/*" + '.py', 'file.name'])) == ['c' + '.py']
+        assert list(paths_match(['file.name', 'x.y'], ["**/*.d", 'file.name'])) == ['file.name']
+        assert list(paths_match(['c' + '.py'], ["**/*.d", 'file.name'])) == []
+
+    def test_relative_file_paths(self):
+        assert relative_file_paths("", []) == set()
+        assert not relative_file_paths("", [])
+        assert not relative_file_paths("", ['NonExistingPackageName'])
+
+        files = relative_file_paths("", ["*"])
+
+        assert files
+        assert TST_SETUP in files
+        assert not any("/" in _.replace("\\", "/") for _ in files)
+        assert not any(_.startswith(".") for _ in files)
+
+        files = relative_file_paths("", [".*"])
+
+        assert files
+        assert '.gitignore' in files
+        assert not any("/" in _.replace("\\", "/") for _ in files)
+        assert all(_.startswith(".") for _ in files)
+
+        files = relative_file_paths("", [os_path_join("**", "*" + '.py')])
+
+        assert files == {TST_SETUP, TST_TESTS_MODULE, TST_TESTS_CONF_PATH, TST_MODULE}
+
+        assert files == relative_file_paths("", [os_path_join("**", "*")], skip_file_path=lambda fp: fp[-3:] != '.py')
+
+    def test_skip_py_cache_files(self):
+        assert skip_py_cache_files('__pycache__')
+        assert skip_py_cache_files(f"a/c/c/{'__pycache__'}")
+        assert skip_py_cache_files(f"/a/c/c/{'__pycache__'}")
+        assert skip_py_cache_files(f"a/c/c/{'__pycache__'}/.")
+        assert skip_py_cache_files(f"a/c/c/{'__pycache__'}/x" + '.py')
+
+
+class TestMoveFiles:
+    def test_blocked_moves_to_parent_dir(self, tst_move_files):
+        src_dir = os_path_dirname(tst_move_files[0])
+        dst_dir = os_path_join(src_dir, "..")
+        dst_block_file = os_path_join(dst_dir, TST_INI_FILE)
+        write_file_text(TST_OLD_CONTENT, dst_block_file)
+        assert os_path_isfile(dst_block_file)
+        for src_file_path in tst_move_files:
+            assert os_path_isfile(src_file_path)
+            dst_file = os_path_join(dst_dir, os_path_relpath(src_file_path, src_dir))
+            assert dst_file == dst_block_file or not os_path_isfile(dst_file)
+        tst_overwrite = (TST_OVER_FOLDER_NAME in src_dir)
+
+        move_files(src_dir, dst_dir, overwrite=tst_overwrite)
+
+        if not tst_overwrite:
+            assert os_path_isfile(tst_move_files[0])
+            assert read_file_text(tst_move_files[0]) == TST_FILE_CONTENT
+            dst_file = os_path_join(dst_dir, os_path_relpath(tst_move_files[0], src_dir))
+            assert os_path_isfile(dst_file)
+            assert read_file_text(dst_file) == TST_OLD_CONTENT
+
+            assert not os_path_isfile(tst_move_files[1])
+            dst_file = os_path_join(dst_dir, os_path_relpath(tst_move_files[1], src_dir))
+            assert os_path_isfile(dst_file)
+            assert read_file_text(dst_file) == TST_NEW_CONTENT
+
+    def test_file_moves_to_user_dir_via_check_all(self, monkeypatch, tst_move_files, tmp_path):
+        src_dir = os_path_dirname(tst_move_files[0])
+        dst_dir = str(tmp_path)
+        monkeypatch.setitem(PATH_PLACEHOLDERS, 'usr', dst_dir)
+
+        moved = move_files(src_dir, "{usr}")
+
+        assert moved
+        for src_file_path in tst_move_files:
+            assert not os_path_isfile(src_file_path) and not os_path_isdir(src_file_path)
+            assert os_path_isfile(os_path_join(dst_dir, os_path_relpath(src_file_path, src_dir)))
+
+    def test_moves_to_parent_dir(self, tst_move_files):
+        src_dir = os_path_dirname(tst_move_files[0])
+        dst_dir = os_path_join(src_dir, "..")
+        for src_file_path in tst_move_files:
+            assert os_path_isfile(src_file_path)
+            assert not os_path_isfile(os_path_join(dst_dir, os_path_relpath(src_file_path, src_dir)))
+            assert not os_path_isdir(os_path_join(dst_dir, os_path_relpath(src_file_path, src_dir)))
+        tst_overwrite = (TST_OVER_FOLDER_NAME in src_dir)
+
+        move_files(src_dir, dst_dir, overwrite=tst_overwrite)
+
+        if not tst_overwrite:
+            for src_file_path in tst_move_files:
+                assert not os_path_isfile(src_file_path) and not os_path_isdir(tst_move_files[0])
+                assert os_path_isfile(os_path_join(dst_dir, os_path_relpath(src_file_path, src_dir)))
+
+    def test_overwrites_to_parent_dir(self, tst_move_files):
+        src_dir = os_path_dirname(tst_move_files[0])
+        dst_dir = os_path_join(src_dir, "..")
+        for src_file_path in tst_move_files:
+            assert os_path_isfile(src_file_path)
+            assert not os_path_isdir(os_path_join(dst_dir, os_path_relpath(src_file_path, src_dir)))
+            assert not os_path_isfile(os_path_join(dst_dir, os_path_relpath(src_file_path, src_dir)))
+        tst_overwrite = (TST_OVER_FOLDER_NAME in src_dir)
+
+        move_files(src_dir, dst_dir, overwrite=tst_overwrite)
+
+        if tst_overwrite:
+            for src_file_path in tst_move_files:
+                assert not os_path_isfile(src_file_path) and not os_path_isdir(tst_move_files[0])
+                assert os_path_isfile(os_path_join(dst_dir, os_path_relpath(src_file_path, src_dir)))
+
+    def test_unblocked_overwrites_to_parent_dir(self, tst_move_files):
+        src_dir = os_path_dirname(tst_move_files[0])
+        dst_dir = os_path_join(src_dir, "..")
+        dst_block_file = os_path_join(dst_dir, TST_INI_FILE)
+        write_file_text(TST_OLD_CONTENT, dst_block_file)
+        assert os_path_isfile(dst_block_file)
+        for src_file_path in tst_move_files:
+            assert os_path_isfile(src_file_path)
+            dst_file = os_path_join(dst_dir, os_path_relpath(src_file_path, src_dir))
+            assert dst_file == dst_block_file or not os_path_isfile(dst_file)
+        tst_overwrite = (TST_OVER_FOLDER_NAME in src_dir)
+
+        move_files(src_dir, dst_dir, overwrite=tst_overwrite)
+
+        if tst_overwrite:
+            assert not os_path_isfile(tst_move_files[0]) and not os_path_isdir(tst_move_files[0])
+            dst_file = os_path_join(dst_dir, os_path_relpath(tst_move_files[0], src_dir))
+            assert os_path_isfile(dst_file)
+            assert read_file_text(dst_file) == TST_FILE_CONTENT
+
+            assert not os_path_isfile(tst_move_files[1])
+            dst_file = os_path_join(dst_dir, os_path_relpath(tst_move_files[1], src_dir))
+            assert os_path_isfile(dst_file)
+            assert read_file_text(dst_file) == TST_NEW_CONTENT
+
+
+class TestPathFiles:
+    def test_file_callable(self):
+        def add_file(f_name, **kwargs):
+            """ callable used for the file_class argument of path_files. """
+            added.append((f_name, kwargs))
+            return f_name
+        added = []
+        found = path_files("**" + '.py', file_class=add_file, a=1, b=2)
+
+        assert len(found) == len(added)
+        assert len(found) == 1
+        assert found[0] == TST_SETUP
+        assert added[0][0] == found[0]
+        assert added[0][1] == dict(a=1, b=2)
+
+    def test_file_class(self):
+        class FileClass:
+            """ class used for the file_class argument of path_files. """
+            def __init__(self, f_name, **kwargs):
+                self.file_name = f_name
+                self.stem = os_path_splitext(f_name)[0]
+                added.append((f_name, kwargs))
+        added = []
+        found = path_files("*" + '.py', file_class=FileClass, a=3, b=6)
+
+        assert len(found) == len(added)
+        assert len(found) == 1
+        assert found[0].file_name == TST_SETUP
+        assert found[0].stem == "setup"
+        assert added[0][0] == found[0].file_name
+        assert added[0][1] == dict(a=3, b=6)
+
+    def test_non_recursive(self):
+        assert path_files(TST_SETUP) == [TST_SETUP]
+        assert path_files(TST_MODULE) == [TST_MODULE]
+        assert path_files(TST_TESTS_MODULE) == [TST_TESTS_MODULE]
+
+        assert path_files("../ae_paths") == []
+        assert path_files("../ae_paths/" + TST_SETUP) == ["../ae_paths/" + TST_SETUP]
+
+        assert path_files(".") == []
+        assert path_files("./" + TST_SETUP) == ["./" + TST_SETUP]
+        assert path_files("./" + TST_MODULE) == ["./" + TST_MODULE]
+
+        assert path_files('ae') == []
+        assert path_files(TST_MODULE) == [TST_MODULE]
+
+        assert path_files(TST_TMP_ROOT) == []
+        assert path_files(TST_TESTS_MODULE) == [TST_TESTS_MODULE]
+
+    def test_path_lib(self):
+        found = path_files("*" + '.py', file_class=pathlib.PurePath)
+
+        assert len(found) == 1
+        assert found[0].name == TST_SETUP
+        assert found[0].stem == "setup"
+
+        found = path_files("*" + '.py', file_class=pathlib.Path)
+
+        assert len(found) == 1
+        assert found[0].name == TST_SETUP
+        assert found[0].stem == "setup"
+
+    def test_placeholders(self):
+        assert len(path_files("{cwd}")) == len(path_files("."))
+        assert path_files("{cwd}/" + TST_MODULE)[0].endswith("/ae_paths/" + TST_MODULE)
+
+        assert len(path_files("{cwd}/**/*" + '.py')) == 4  # ...setup.py, ...paths.py, ...test_paths.py, ...conftest.py
+        assert all(_.endswith('.py') for _ in path_files("{cwd}/**/*" + '.py'))
+        assert all(_.startswith("/") for _ in path_files("{cwd}/**/*" + '.py'))
+
+    def test_wildcards(self):
+        assert path_files("*" + '.py') == [TST_SETUP]
+        assert path_files("**" + '.py') == [TST_SETUP]
+
+        assert path_files("set??" + '.py') == [TST_SETUP]
+        assert path_files("setup*" + '.py') == [TST_SETUP]
+        assert path_files("setup**" + '.py') == [TST_SETUP]
+
+        assert TST_MODULE in path_files("ae/**")
+        assert path_files("ae/**/*" + '.py') == [TST_MODULE]
+        assert path_files("**/pat?s" + '.py') == [TST_MODULE]
+
+        assert len(path_files("**/*" + '.py')) == 4
+        assert set(path_files("**/*" + '.py')) == {
+            TST_SETUP, TST_MODULE, TST_TESTS_MODULE, TST_TESTS_CONF_PATH}
+
+        assert path_files("{cwd}/**/paths" + '.py')[0].endswith("ae_paths/" + TST_MODULE)
+        assert path_files("{cwd}/**/paths.?y")[0].endswith("ae_paths/" + TST_MODULE)
+
+        assert len(path_files("{cwd}/**/*paths" + '.py')) == 2
+        assert len(path_files("{cwd}/**/*paths.?y")) == 2
+
+    def test_without_placeholders_and_wildcards(self):
+        assert path_files(TST_SETUP) == [TST_SETUP]
+        assert path_files(TST_MODULE) == [TST_MODULE]
+        assert path_files(TST_TESTS_MODULE) == [TST_TESTS_MODULE]
+
+        assert path_files("../ae_paths") == []
+        assert path_files("../ae_paths/" + TST_SETUP) == ["../ae_paths/" + TST_SETUP]
+
+        assert path_files(".") == []
+        assert all(_[0] == "." for _ in path_files("."))
+        assert path_files("./" + TST_SETUP) == ["./" + TST_SETUP]
+
+        assert path_files('ae') == []
+        assert TST_MODULE not in path_files('ae')        # can also contain __pycache__/paths.cpython-36.pyc
+        assert path_files(TST_MODULE) == [TST_MODULE]
+
+        assert path_files(TST_TMP_ROOT) == []
+        assert TST_TESTS_MODULE not in path_files(TST_TMP_ROOT)
+        assert path_files(TST_TESTS_MODULE) == [TST_TESTS_MODULE]
+
+
+class TestPathFolders:
+    def test_file_class(self):
+        class FileClass:
+            """ class used for the file_class argument of path_folders. """
+            def __init__(self, f_name, **kwargs):
+                self.folder_name = f_name
+                self.stem = os_path_splitext(f_name)[0]
+                added.append((f_name, kwargs))
+        added = []
+        found = path_folders(TST_TMP_ROOT, folder_class=FileClass, a=3, b=6)
+
+        assert len(found) == len(added)
+        assert len(found) == 1
+        assert found[0].folder_name == TST_TMP_ROOT
+        assert found[0].stem == TST_TMP_ROOT
+        assert added[0][0] == found[0].folder_name
+        assert added[0][1] == dict(a=3, b=6)
+
+    def test_folder_callable(self):
+        def add_folder(folder_name, **kwargs):
+            """ callable used for the file_class argument of path_folders. """
+            added.append((folder_name, kwargs))
+            return folder_name
+        added = []
+        found = path_folders(TST_TMP_ROOT, folder_class=add_folder, a=1, b=2)
+
+        assert len(found) == len(added)
+        assert len(found) == 1
+        assert found[0] == TST_TMP_ROOT
+        assert added[0][0] == found[0]
+        assert added[0][1] == dict(a=1, b=2)
+
+    def test_path_lib(self):
+        found = path_folders(TST_TMP_ROOT, folder_class=pathlib.PurePath)
+
+        assert len(found) == 1
+        assert found[0].name == os_path_basename(TST_TMP_ROOT)
+        assert found[0].stem == os_path_basename(TST_TMP_ROOT)
+
+        found = path_folders(TST_TMP_ROOT, folder_class=pathlib.Path)
+
+        assert len(found) == 1
+        assert found[0].name == os_path_basename(TST_TMP_ROOT)
+        assert found[0].stem == os_path_basename(TST_TMP_ROOT)
+
+    def test_non_recursive(self):
+        assert path_folders(TST_SETUP) == []
+        assert path_folders(TST_MODULE) == []
+        assert path_folders(TST_TESTS_MODULE) == []
+
+        assert path_folders("../ae_paths") == ["../ae_paths"]
+        assert path_folders("../ae_paths/" + TST_SETUP) == []
+
+        assert path_folders(".") == ["."]
+        assert path_folders("./" + TST_SETUP) == []
+        assert path_folders("./" + TST_MODULE) == []
+
+        assert path_folders('ae') == ['ae']
+        assert path_folders(TST_MODULE) == []
+
+        assert path_folders(TST_TMP_ROOT) == [TST_TMP_ROOT]
+        assert path_folders(TST_TESTS_MODULE) == []
+
+    def test_placeholders(self):
+        assert len(path_folders("{cwd}")) == len(path_folders("."))
+        assert path_folders("{cwd}/ae")[0].endswith("/ae_paths/ae")
+
+        assert path_folders("{cwd}/**")
+        assert any(_.endswith("/ae_paths/ae") for _ in path_folders("{cwd}/**"))
+        assert any(_.endswith("/ae_paths/" + TST_FOLDER_TESTS) for _ in path_folders("{cwd}/**"))
+        assert all(_.startswith("/") for _ in path_folders("{cwd}/**"))
+
+    def test_wildcards(self):
+        assert path_folders("*" + '.py') == []
+        assert path_folders("**" + '.py') == []
+
+        assert path_folders("set??" + '.py') == []
+        assert path_folders("setup*" + '.py') == []
+        assert path_folders("setup**" + '.py') == []
+
+        assert "../ae_paths/ae" in path_folders("../ae_paths/**")
+        assert "../ae_paths/ae/" in path_folders("../ae_paths/ae/**")
+
+        assert path_folders("**")
+        assert 'ae' in path_folders("**")
+        assert TST_FOLDER_TESTS in path_folders("**")
+
+        assert any(_.endswith("ae_paths/ae") for _ in path_folders("{cwd}/**"))
+        assert any(_.endswith("ae_paths/ae/") for _ in path_folders("{cwd}/**/"))
+
+    def test_without_placeholders_and_wildcards(self):
+        assert path_folders(TST_SETUP) == []
+        assert path_folders(TST_MODULE) == []
+        assert path_folders(TST_TESTS_MODULE) == []
+
+        assert path_folders("../ae_paths") == ["../ae_paths"]
+        assert path_folders("../ae_paths/" + TST_SETUP) == []
+
+        assert path_folders(".") == ["."]
+        assert all(_[0] == "." for _ in path_folders("."))
+        assert path_folders("./" + TST_SETUP) == []
+
+        assert path_folders('ae') == ['ae']
+        assert TST_MODULE not in path_folders('ae')        # can also contain __pycache__/paths.cpython-36.pyc
+        assert path_folders(TST_MODULE) == []
+
+        assert path_folders(TST_TMP_ROOT) == [TST_TMP_ROOT]
+        assert TST_TESTS_MODULE not in path_folders(TST_TMP_ROOT)
+        assert path_folders(TST_TESTS_MODULE) == []
+
+
+class TestPathItems:
+    def test_file_callable(self):
+        def add_file(f_name, **kwargs):
+            """ callable used for the file_class argument of path_files. """
+            added.append((f_name, kwargs))
+            return f_name
+        added = []
+        found = path_items("**" + '.py', creator=add_file, a=1, b=2)
+
+        assert len(found) == len(added)
+        assert len(found) == 1
+        assert found[0] == TST_SETUP
+        assert added[0][0] == found[0]
+        assert added[0][1] == dict(a=1, b=2)
+
+    def test_file_class(self):
+        class FileClass:
+            """ class used for the file_class argument of path_files. """
+            def __init__(self, f_name, **kwargs):
+                self.file_name = f_name
+                self.stem = os_path_splitext(f_name)[0]
+                added.append((f_name, kwargs))
+        added = []
+        found = path_items("*" + '.py', creator=FileClass, a=3, b=6)
+
+        assert len(found) == len(added)
+        assert len(found) == 1
+        assert found[0].file_name == TST_SETUP
+        assert found[0].stem == "setup"
+        assert added[0][0] == found[0].file_name
+        assert added[0][1] == dict(a=3, b=6)
+
+    def test_non_recursive(self):
+        assert path_items(TST_SETUP) == [TST_SETUP]
+        assert path_items(TST_MODULE) == [TST_MODULE]
+        assert path_items(TST_TESTS_MODULE) == [TST_TESTS_MODULE]
+
+        assert path_items("../ae_paths") == ["../ae_paths"]
+        assert path_items("../ae_paths/" + TST_SETUP) == ["../ae_paths/" + TST_SETUP]
+
+        assert path_items(".") == ["."]
+        assert path_items("./" + TST_SETUP) == ["./" + TST_SETUP]
+        assert path_items("./" + TST_MODULE) == ["./" + TST_MODULE]
+
+        assert path_items('ae') == ['ae']
+        assert path_items(TST_MODULE) == [TST_MODULE]
+
+        assert path_items(TST_TMP_ROOT) == [TST_TMP_ROOT]
+        assert path_items(TST_TESTS_MODULE) == [TST_TESTS_MODULE]
+
+    def test_path_lib(self):
+        found = path_files("*" + '.py', file_class=pathlib.PurePath)
+
+        assert len(found) == 1
+        assert found[0].name == TST_SETUP
+        assert found[0].stem == "setup"
+
+        found = path_items("*" + '.py', creator=pathlib.Path)
+
+        assert len(found) == 1
+        assert found[0].name == TST_SETUP
+        assert found[0].stem == "setup"
+
+    def test_placeholders(self):
+        assert len(path_items("{cwd}")) == len(path_items("."))
+        assert path_items("{cwd}/" + TST_MODULE)[0].endswith("/ae_paths/" + TST_MODULE)
+
+        assert len(path_items("{cwd}/**/*" + '.py')) == 4  # ...setup.py, ...paths.py, ...test_paths.py, ...conftest.py
+        assert all(_.endswith('.py') for _ in path_items("{cwd}/**/*" + '.py'))
+        assert all(_.startswith("/") for _ in path_items("{cwd}/**/*" + '.py'))
+
+    def test_wildcards(self):
+        assert path_items("*" + '.py') == [TST_SETUP]
+        assert path_items("**" + '.py') == [TST_SETUP]
+
+        assert path_items("set??" + '.py') == [TST_SETUP]
+        assert path_items("setup*" + '.py') == [TST_SETUP]
+        assert path_items("setup**" + '.py') == [TST_SETUP]
+
+        assert TST_MODULE in path_items("ae/**")
+        assert path_items("ae/**/*" + '.py') == [TST_MODULE]
+        assert path_items("**/pat?s" + '.py') == [TST_MODULE]
+
+        assert len(path_items("**/*" + '.py')) == 4
+        assert set(path_items("**/*" + '.py')) == {
+            TST_SETUP, TST_MODULE, TST_TESTS_MODULE, TST_TESTS_CONF_PATH}
+
+        assert path_items("{cwd}/**/paths" + '.py')[0].endswith("ae_paths/" + TST_MODULE)
+        assert path_items("{cwd}/**/paths.?y")[0].endswith("ae_paths/" + TST_MODULE)
+
+        assert len(path_items("{cwd}/**/*paths" + '.py')) == 2
+        assert len(path_items("{cwd}/**/*paths.?y")) == 2
+
+    def test_without_placeholders_and_wildcards(self):
+        assert path_items(TST_SETUP) == [TST_SETUP]
+        assert path_items(TST_MODULE) == [TST_MODULE]
+
+        assert path_items(TST_FOLDER_TESTS) == [TST_FOLDER_TESTS]
+        assert TST_TESTS_MODULE not in path_items(TST_FOLDER_TESTS)
+        assert path_items(TST_TESTS_MODULE) == [TST_TESTS_MODULE]
+
+        assert path_items(TST_TMP_ROOT) == [TST_TMP_ROOT]
+
+        assert path_items("../ae_paths") == ["../ae_paths"]
+        assert path_items("../ae_paths/" + TST_SETUP) == ["../ae_paths/" + TST_SETUP]
+
+        assert path_items(".") == ["."]
+        assert all(_[0] == "." for _ in path_items("."))
+        assert path_items("./" + TST_SETUP) == ["./" + TST_SETUP]
+
+        assert path_items('ae') == ['ae']
+        assert TST_MODULE not in path_items('ae')        # can also contain __pycache__/paths.cpython-36.pyc
+        assert path_items(TST_MODULE) == [TST_MODULE]
+
+
+class TestPathPlaceholdersGlobal:
+    def test_add_common_storage_paths(self):
+        paths_count = len(PATH_PLACEHOLDERS)
+        add_common_storage_paths()
+        assert len(PATH_PLACEHOLDERS) >= paths_count                # 6 >= 6
+        if 'CI_PROJECT_ID' not in os.environ:                       # skip on GitLab CI
+            assert len(PATH_PLACEHOLDERS) > paths_count
+            if plyer_is_importable:
+                assert 'application' in PATH_PLACEHOLDERS
+                assert 'documents' in PATH_PLACEHOLDERS
+                assert 'downloads' in PATH_PLACEHOLDERS
+                assert 'external_storage' in PATH_PLACEHOLDERS
+                assert 'home' in PATH_PLACEHOLDERS
+                assert 'music' in PATH_PLACEHOLDERS
+                assert 'pictures' in PATH_PLACEHOLDERS
+                assert 'root' in PATH_PLACEHOLDERS
+                assert 'videos' in PATH_PLACEHOLDERS
+        if os_platform == 'android':
+            assert 'sdcard' in PATH_PLACEHOLDERS
+
+    def test_normalize(self):
+        f_path = "norm_file.tst"
+        assert normalize(f_path, make_absolute=False, remove_dots=False, resolve_sym_links=False) == f_path
+        assert normalize(f_path, make_absolute=False, remove_dots=False) == os_path_realpath(f_path)
+        assert normalize(f_path, make_absolute=False, resolve_sym_links=False) == f_path
+        assert normalize(f_path, make_absolute=False) == os_path_realpath(f_path)
+        assert normalize(f_path, remove_dots=False, resolve_sym_links=False) == os_path_abspath(f_path)
+        assert normalize(f_path, remove_dots=False) == os_path_realpath(f_path)
+        assert normalize(f_path, resolve_sym_links=False) == os_path_abspath(f_path)
+        assert normalize(f_path) == os_path_realpath(f_path)
+
+        f_path = os_path_join(TST_TMP_ROOT, "norm_test.tst")
+        assert normalize(f_path, make_absolute=False, remove_dots=False, resolve_sym_links=False) == f_path
+        assert normalize(f_path, make_absolute=False, remove_dots=False) == os_path_realpath(f_path)
+        assert normalize(f_path, make_absolute=False, resolve_sym_links=False) == f_path
+        assert normalize(f_path, make_absolute=False) == os_path_realpath(f_path)
+        assert normalize(f_path, remove_dots=False, resolve_sym_links=False) == os_path_abspath(f_path)
+        assert normalize(f_path, remove_dots=False) == os_path_realpath(f_path)
+        assert normalize(f_path, resolve_sym_links=False) == os_path_abspath(f_path)
+        assert normalize(f_path) == os_path_realpath(f_path)
+        assert normalize(f_path, remove_base_path=TST_TMP_ROOT) == "norm_test.tst"
+        assert normalize(f_path, remove_base_path=TST_TMP_ROOT) == os_path_relpath(f_path, TST_TMP_ROOT)
+        assert normalize(f_path, remove_base_path='_not_existing_').startswith("../")
+        assert normalize(f_path, remove_base_path='_not_existing_').endswith(".." + f_path)
+
+        f_path = f"_not_existing_folder/norm_test.tst"
+        assert normalize(f_path, make_absolute=False, remove_dots=False, resolve_sym_links=False) == f_path
+        assert normalize(f_path, make_absolute=False, remove_dots=False) == os_path_realpath(f_path)
+        assert normalize(f_path, make_absolute=False, resolve_sym_links=False) == f_path
+        assert normalize(f_path, make_absolute=False) == os_path_realpath(f_path)
+        assert normalize(f_path, remove_dots=False, resolve_sym_links=False) == os_path_abspath(f_path)
+        assert normalize(f_path, remove_dots=False) == os_path_realpath(f_path)
+        assert normalize(f_path, resolve_sym_links=False) == os_path_abspath(f_path)
+        assert normalize(f_path) == os_path_realpath(f_path)
+        assert normalize(f_path, remove_base_path=TST_TMP_ROOT).endswith(f_path)
+        assert normalize(f_path, remove_base_path=TST_TMP_ROOT) == os_path_relpath(f_path, TST_TMP_ROOT)
+        assert normalize(f_path, remove_base_path='_not_existing_') == os_path_join("..", f_path)
+        assert normalize(f_path, remove_base_path=TST_TMP_ROOT).endswith(f_path)
+
+        f_path = "~/normalize_test.tst"
+        assert len(normalize(f_path)) > len(f_path)
+        assert normalize(f_path, make_absolute=False, remove_dots=False, resolve_sym_links=False).endswith(f_path[1:])
+        assert normalize(f_path).endswith(f_path[1:])
+
+        f_path = "."
+        assert normalize(f_path, make_absolute=False, remove_dots=False, resolve_sym_links=False) == "."
+        assert len(normalize(f_path)) == len(os.getcwd())
+
+        f_path = ""
+        assert normalize(f_path, make_absolute=False, remove_dots=False, resolve_sym_links=False) == "."
+        assert len(normalize(f_path)) == len(os.getcwd())
+
+    def test_placeholder_key(self):
+        f_name = "test.tst"
+        file_path = os_path_join(os.getcwd(), f_name)
+        assert placeholder_key(f_name) == ""
+        assert placeholder_key(file_path) == "cwd"
+        assert placeholder_key(file_path).format(**PATH_PLACEHOLDERS) == "cwd"
+        assert format_given(placeholder_key(file_path), PATH_PLACEHOLDERS) == "cwd"
+
+    def test_placeholder_path(self):
+        f_name = "test.tst"
+        file_path = os_path_join(os.getcwd(), f_name)
+        assert placeholder_path(f_name) == f_name
+        assert placeholder_path(file_path) == "{cwd}" + "/" + f_name
+        assert placeholder_path(file_path).format(**PATH_PLACEHOLDERS) == file_path
+        assert format_given(placeholder_path(file_path), PATH_PLACEHOLDERS) == file_path
+        assert normalize(placeholder_path(file_path)) == file_path
+
+    def test_placeholder_path_exact_dir_name(self):
+        f_name = "test.tst"
+        file_path = os_path_join(os.getcwd() + "_dir_name_extended", f_name)
+        assert not placeholder_path(file_path).startswith("{cwd}")
+        # the next assertion would fail because placeholder_path(file_path) == "{home}/src/ae_paths_extended/test.tst"
+        # assert placeholder_path(file_path) == file_path
+
+
+class TestProjectPaths:
+    def test_cwd_path(self):
+        assert 'cwd' in PATH_PLACEHOLDERS
+        assert PATH_PLACEHOLDERS['cwd'] == os.getcwd()
+
+
+class TestSeriesFileName:
+    def test_series_file_name_basics(self, tmp_path):
+        file_mask = os_path_join(str(tmp_path), "series_tests*.tst")
+        file_path = file_mask.replace("*", "")
+
+        assert series_file_name(file_path) == file_mask.replace("*", " 01")
+        assert not os_path_isfile(file_mask.replace("*", " 01"))
+
+        assert series_file_name(file_path, marker='_copy_') == file_mask.replace("*", '_copy_' + "01")
+        assert not os_path_isfile(file_mask.replace("*", '_copy_' + "01"))
+
+        assert series_file_name(file_path, digits=1) == file_mask.replace("*", " 1")
+        assert not os_path_isfile(file_mask.replace("*", " 1"))
+
+        assert series_file_name(file_path, create=True, digits=1, marker='_') == file_mask.replace("*", "_1")
+        assert not os_path_isfile(file_mask.replace("*", " 1"))
+
+    def test_series_file_name_conflict_in_create(self, tmp_path):
+        file_mask = os_path_join(str(tmp_path), "series_tests*.tst")
+        file_path = file_mask.replace("*", "")
+
+        write_file(file_mask.replace("*", " aaa"), "any content")
+        write_file(file_mask.replace("*", " 04"), "any")
+
+        assert series_file_name(file_path, create=True) == file_mask.replace("*", " 03")
+        assert os_path_isfile(file_mask.replace("*", " 03"))
+
+        assert series_file_name(file_path, create=True) == file_mask.replace("*", " 05")
+        assert os_path_isfile(file_mask.replace("*", " 05"))
+
+    def test_series_file_name_create(self, tmp_path):
+        file_mask = os_path_join(str(tmp_path), "series_tests*.tst")
+        file_path = file_mask.replace("*", "")
+
+        assert series_file_name(file_path, create=True) == file_mask.replace("*", " 01")
+        assert os_path_isfile(file_mask.replace("*", " 01"))
+
+        assert series_file_name(file_path, create=True) == file_mask.replace("*", " 02")
+        assert os_path_isfile(file_mask.replace("*", " 02"))
+
+
+class TestUserDataPath:
+    @pytest.mark.parametrize("platform", ('linux', 'freebsd', 'any_other_os'))
+    def test_user_data_path_all_linux(self, platform):
+        tst_dir = "/.config"
+
+        with patch('ae.paths.os_platform', platform):
+            assert user_data_path().endswith(tst_dir)
+
+        with patch('ae.paths.os_platform', platform), patch.dict('os.environ', dict(XDG_CONFIG_HOME="")):
+            assert user_data_path().endswith(tst_dir)
+
+        with patch('ae.paths.os_platform', platform), patch.dict('os.environ', dict(XDG_CONFIG_HOME=tst_dir)):
+            assert user_data_path().endswith(tst_dir)
+
+    def test_user_data_path_android(self):
+        mock_jnius = MagicMock()
+        mock_cls = mock_jnius.cast.return_value
+        mock_cls.getAbsolutePath.return_value = '/android/tst/data/dir'
+
+        with (patch('ae.paths.os_platform', 'android'),
+              patch('ae.paths.importlib.import_module', return_value=mock_jnius) as imp_mock):
+            assert user_data_path() == '/android/tst/data/dir'
+
+        imp_mock.assert_called_once_with('jnius')
+        mock_jnius.autoclass.assert_called_once_with('org.kivy.android.PythonActivity')
+
+    def test_user_data_path_cygwin(self):
+        test_root = "/test_path"
+        with patch('ae.paths.os_platform', 'cygwin'), patch.dict('os.environ', dict(APPDATA=test_root)):
+            assert user_data_path() == test_root
+
+    def test_user_data_path_darwin(self):
+        with patch('ae.paths.os_platform', 'darwin'):
+            assert user_data_path() == os_path_expanduser(os_path_join("~", "Library", "Application Support"))
+
+    def test_user_data_path_ios(self):
+        with patch('ae.paths.os_platform', 'ios'):
+            assert user_data_path() == os_path_expanduser(os_path_join("~", "Documents"))
+
+    def test_user_data_path_placeholder(self):
+        assert 'usr' in PATH_PLACEHOLDERS
+
+    # @pytest.mark.skipif("os_platform != 'android'", reason="android-only test")
+    # def test_user_data_path_running_android(self):
+    #     with patch.dict('os.environ', dict(ANDROID_ARGUMENT='any_value')):
+    #         assert user_data_path()
+    #     with patch.dict('os.environ', dict(KIVY_BUILD='any_value')):
+    #         assert user_data_path()
+
+    def test_user_data_path_win32(self):
+        test_root = "/test_path"
+        with patch('ae.paths.os_platform', 'win32'), patch.dict('os.environ', dict(APPDATA=test_root)):
+            assert user_data_path() == test_root
+
+
+class TestUserDocsPath:
+    @pytest.mark.parametrize("platform", ('darwin', 'ios', 'linux', 'freebsd', 'any_other_os'))
+    def test_user_docs_path_all_posix(self, platform):
+        with patch('ae.paths.os_platform', platform):
+            assert user_docs_path() == os_path_expanduser(os_path_join("~", "Documents"))
+
+    def test_user_docs_path_android(self):
+        mock_jnius = MagicMock()
+        mock_cls = mock_jnius.autoclass.return_value
+        mock_cls.DIRECTORY_DOCUMENTS = 'DocumentsDir'
+        mock_cls.getExternalStoragePublicDirectory.return_value.getAbsolutePath.return_value = '/android/tst/docs/dir'
+
+        with (patch('ae.paths.os_platform', 'android'),
+              patch('ae.paths.importlib.import_module', return_value=mock_jnius) as imp_mock):
+            assert user_docs_path() == '/android/tst/docs/dir'
+
+        imp_mock.assert_called_once_with('jnius')
+        mock_jnius.autoclass.assert_called_once_with('android.os.Environment')
+        mock_cls.getExternalStoragePublicDirectory.assert_called_once_with('DocumentsDir')
+
+    def test_user_docs_path_cygwin(self):
+        test_root = "/tst_usr_root"
+        with patch('ae.paths.os_platform', 'cygwin'), patch.dict('os.environ', dict(USERPROFILE=test_root)):
+            assert user_docs_path() == test_root + "/Documents"
+
+    def test_user_docs_path_darwin(self):
+        with patch('ae.paths.os_platform', 'darwin'):
+            assert user_docs_path() == os_path_expanduser(os_path_join("~", "Documents"))
+
+    def test_user_docs_path_ios(self):
+        with patch('ae.paths.os_platform', 'ios'):
+            assert user_docs_path() == os_path_expanduser(os_path_join("~", "Documents"))
+
+    def test_user_docs_path_placeholder(self):
+        assert 'doc' in PATH_PLACEHOLDERS
+
+    # @pytest.mark.skipif("os_platform != 'android'", reason="android-only test")
+    # def test_user_docs_path_running_on_android(self):
+    #     with patch.dict('os.environ', dict(ANDROID_ARGUMENT='any_value')):
+    #         assert user_docs_path()
+    #     with patch.dict('os.environ', dict(KIVY_BUILD='any_value')):
+    #         assert user_docs_path()
+
+    def test_user_docs_path_win32(self):
+        test_root = "/test_usr_path"
+        with patch('ae.paths.os_platform', 'win32'), patch.dict('os.environ', dict(USERPROFILE=test_root)):
+            assert user_docs_path() == test_root + "/Documents"
