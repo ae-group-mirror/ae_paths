@@ -7,9 +7,11 @@ import pytest
 import sys
 import types
 from ctypes import create_unicode_buffer
+from typing import Any
 from unittest.mock import patch, MagicMock
 
 from ae.base import (
+    UNSET,
     format_given, os_path_abspath, os_path_basename, os_path_dirname, os_path_expanduser, os_path_isfile, os_path_isdir,
     os_path_join, os_path_realpath, os_path_relpath, os_path_splitext, write_file)
 from ae.system import app_name_guess, os_platform 
@@ -17,7 +19,7 @@ from ae.files import read_file_text, write_file_text, CachedFile, RegisteredFile
 
 from ae.paths import (
     I18N_FOLDER, IMAGE_FOLDER, PATH_PLACEHOLDERS, RESOURCES_NAMES, SOUND_FOLDER,
-    add_common_storage_paths, app_data_path, app_docs_path, coll_folders, coll_items,
+    add_common_storage_paths, app_data_path, app_docs_path, coll_files, coll_folders, coll_items, coll_item_type,
     copy_files, move_files, normalize, path_files, path_folders, path_items, path_join, path_match,
     path_name, paths_match, placeholder_key, placeholder_path, series_file_name, relative_file_paths,
     resources_folder_names, skip_py_cache_files, user_data_path, user_docs_path,
@@ -288,6 +290,8 @@ class TestAppPaths:
 class TestCollector:
     def test_add_placeholder(self):
         coll = Collector(app="tst_app_path", main_app_name="tst_app_name")
+
+        assert not coll.error_message
         assert "app" in coll.placeholders
         assert coll.placeholders["app"] == "tst_app_path"
         assert coll.placeholders["main_app_name"] == "tst_app_name"
@@ -295,127 +299,163 @@ class TestCollector:
     def test_collect_append_duplicates(self):
         coll = Collector(app='ae', tst=TST_TMP_ROOT)
         coll.collect("{app}", 'ae', "", append=("{app_name}", "paths" + '.py', "", 'ae'))
+
+        assert not coll.error_message
         assert not coll.paths       # 'ae' not in coll.paths because the prefix of ae/paths.py gets found before ""/ae
         assert coll.files == [TST_MODULE, TST_MODULE]
         assert not coll.selected
         assert coll.failed == 0
-        assert not coll.error_message
 
     def test_collect_appends(self):
         coll = Collector(item_collector=coll_items, app='ae', tst=TST_TMP_ROOT)
         coll.collect("{app}", 'ae', "", append=("{app_name}", "paths" + '.py', "", 'ae'))
+
+        assert not coll.error_message
         assert coll.paths == ['ae', 'ae', ".", 'ae']
         assert coll.files == [TST_MODULE, TST_MODULE]
         assert not coll.selected
         assert coll.failed == 0
-        assert not coll.error_message
 
     def test_collect_append_string(self):
-        coll = Collector(app='ae', tst=TST_TMP_ROOT, main_app_name=__file__)
+        # noinspection PyArgumentEqualDefault
+        coll = Collector(item_collector=coll_files, app='ae', tst=TST_TMP_ROOT, main_app_name=__file__)
         coll.collect("{app}", 'ae', "", append="{main_app_name}")
+
+        assert not coll.error_message
         assert not coll.paths
         assert len(coll.files) == 1       # ["{cwd}/tests/test_paths" + '.py']
         assert coll.files[0].endswith(f"/ae_paths/{TST_TESTS_MODULE}")
         assert not coll.selected
         assert coll.failed == 0
-        assert not coll.error_message
 
     def test_collect_append_tests_files(self):
         coll = Collector()
         coll.collect("", append=TST_TMP_ROOT)
+
+        assert not coll.error_message
         assert coll.paths == []
 
         coll.collect(TST_FOLDER_TESTS, append="*" + '.py')
+
+        assert not coll.error_message
         assert coll.paths == []
         assert sorted(coll.files) == sorted(TST_TESTS_PY_FILES)
 
         coll.collect("", append=os_path_join(TST_FOLDER_TESTS, "*" + '.py'))
+
+        assert not coll.error_message
         assert coll.paths == []
         assert sorted(coll.files) == sorted(TST_TESTS_PY_FILES * 2)
 
         coll.collect(TST_FOLDER_TESTS)
+
+        assert coll.error_message
+        assert coll.failed == 1
         assert coll.paths == []
         assert sorted(coll.files) == sorted(TST_TESTS_PY_FILES * 2)
         assert sorted(coll.selected) == []
 
+        coll.failed = 0
         coll.collect(TST_FOLDER_TESTS, append="")
+
+        assert not coll.error_message
         assert coll.paths == []
         assert sorted(coll.files) == sorted(TST_TESTS_PY_FILES * 2)
         assert sorted(coll.selected) == []
 
         coll.collect(os_path_join(TST_FOLDER_TESTS, "*" + '.py'), append="")
+
+        assert not coll.error_message
         assert coll.paths == []
         assert sorted(coll.files) == sorted(TST_TESTS_PY_FILES * 3)
         assert sorted(coll.selected) == []
-
-        assert coll.failed == 1
-        assert coll.error_message
+        assert coll.failed == 0
         assert dict(coll.prefix_failed) == {TST_FOLDER_TESTS: 1}
         assert dict(coll.suffix_failed) == {'': 1}
 
     def test_collect_append_in_tests(self):
         coll = Collector(item_collector=coll_folders)
         coll.collect("", append=TST_FOLDER_TESTS)
+
+        assert not coll.error_message
         assert coll.paths == [TST_FOLDER_TESTS]
 
         coll.collect(TST_FOLDER_TESTS, append="*" + '.py')
+
+        assert not coll.error_message
         assert coll.paths == [TST_FOLDER_TESTS]
         assert sorted(coll.files) == []
 
         coll.collect("", append=os_path_join(TST_FOLDER_TESTS, "*" + '.py'))
+
+        assert not coll.error_message
         assert coll.paths == [TST_FOLDER_TESTS]
         assert sorted(coll.files) == []
 
         coll.collect(TST_FOLDER_TESTS)
+
+        assert not coll.error_message
         assert coll.paths == [TST_FOLDER_TESTS] * 2
         assert sorted(coll.files) == []
         assert sorted(coll.selected) == [TST_FOLDER_TESTS]
 
         coll.collect(TST_FOLDER_TESTS, append="")
+
+        assert not coll.error_message
         assert coll.paths == [TST_FOLDER_TESTS] * 3
         assert sorted(coll.files) == []
         assert sorted(coll.selected) == [TST_FOLDER_TESTS]
 
         coll.collect(os_path_join(TST_FOLDER_TESTS, "*" + '.py'), append="")
+
+        assert not coll.error_message
         assert coll.paths == [TST_FOLDER_TESTS] * 3
         assert sorted(coll.files) == []
         assert sorted(coll.selected) == [TST_FOLDER_TESTS]
-
         assert coll.failed == 0
-        assert not coll.error_message
         assert dict(coll.prefix_failed) == {}
         assert coll.suffix_failed == {}
 
     def test_collect_append_tests_items(self):
         coll = Collector(item_collector=coll_items)
         coll.collect("", append=TST_FOLDER_TESTS)
+
+        assert not coll.error_message
         assert coll.paths == [TST_FOLDER_TESTS]
 
         coll.collect(TST_FOLDER_TESTS, append="*" + '.py')
+
+        assert not coll.error_message
         assert coll.paths == [TST_FOLDER_TESTS]
         assert sorted(coll.files) == sorted(TST_TESTS_PY_FILES)
 
         coll.collect('', append=os_path_join(TST_FOLDER_TESTS, "*" + '.py'))
+
+        assert not coll.error_message
         assert coll.paths == [TST_FOLDER_TESTS]
         assert sorted(coll.files) == sorted(TST_TESTS_PY_FILES * 2)
 
         coll.collect(TST_FOLDER_TESTS)
+
+        assert not coll.error_message
         assert coll.paths == [TST_FOLDER_TESTS] * 2
         assert sorted(coll.files) == sorted(TST_TESTS_PY_FILES * 2)
         assert sorted(coll.selected) == [TST_FOLDER_TESTS]
 
         coll.collect(TST_FOLDER_TESTS, append="")
+
+        assert not coll.error_message
         assert coll.paths == [TST_FOLDER_TESTS] * 3
         assert sorted(coll.files) == sorted(TST_TESTS_PY_FILES * 2)
         assert sorted(coll.selected) == [TST_FOLDER_TESTS]
 
         coll.collect(os_path_join(TST_FOLDER_TESTS, "*" + '.py'), append="")
+
+        assert not coll.error_message
         assert coll.paths == [TST_FOLDER_TESTS] * 3
         assert sorted(coll.files) == sorted(TST_TESTS_PY_FILES * 3)
         assert sorted(coll.selected) == [TST_FOLDER_TESTS]
-
         assert coll.failed == 0
-        assert not coll.error_message
         assert dict(coll.prefix_failed) == {}
         assert coll.suffix_failed == {}
 
@@ -464,8 +504,8 @@ class TestCollector:
             coll.collect("*/**", append="*" + '.py')
             assert sorted(coll.files) == sorted(sub_py_files3 + sub_py_files2)
 
-            assert coll.failed == 0
             assert not coll.error_message
+            assert coll.failed == 0
         finally:
             if os_path_isdir("sub_dir"):
                 shutil.rmtree("sub_dir")
@@ -473,11 +513,12 @@ class TestCollector:
     def test_collect_no_args(self):
         coll = Collector()
         coll.collect()
+
+        assert not coll.error_message
         assert not coll.paths
         assert not coll.files
         assert not coll.selected
         assert coll.failed == 0
-        assert not coll.error_message
         assert len(coll.prefix_failed) == 0
         assert len(coll.suffix_failed) == 0
 
@@ -485,11 +526,12 @@ class TestCollector:
         coll = Collector(app="tst_app_path")
         prefixes = ("{cwd}/../..", "{app}", "{usr}", "{usr}/{app_name}", "{cwd}/..", "{cwd}", )
         coll.collect(*prefixes, append=("not : valid fil nam", "not_______existent_ tst file name.ext", ))
+
+        assert not coll.error_message
         assert not coll.paths
         assert not coll.files
         assert not coll.selected
         assert coll.failed == 0
-        assert not coll.error_message
         assert not coll.prefix_failed
         assert len(coll.prefix_failed) == 0
         assert len(coll.suffix_failed) == 0
@@ -497,26 +539,31 @@ class TestCollector:
     def test_collect_prefixes_as_relative_and_duplicate_absolute_folder_paths(self):
         coll = Collector(item_collector=coll_folders, app='ae', usr='ae')
         coll.collect('{app}', '{cwd}', '{usr}')
+
+        assert not coll.error_message
         # assert coll.paths == ['ae', "/home/andi/src/ae_paths", 'ae'] != CI: ['ae', "/builds/ae-group/ae_paths", 'ae']
         assert coll.paths == ['ae', normalize('{cwd}'), 'ae']
         assert not coll.files
         assert coll.selected == ['ae', normalize('{cwd}'), 'ae']
         assert coll.failed == 0
-        assert not coll.error_message
 
     def test_collect_prefixes_only(self):
-        coll = Collector(item_collector=coll_items, app='ae', tst=TST_TMP_ROOT)
-        coll.collect("{app}", "{usr}", TST_TESTS_MODULE)
-        assert 1 <= len(coll.paths) <= 2   # ['ae', "/home/andi/.config"], CI: [..., "/builds/ae-group/ae_paths..."]
+        coll = Collector(item_collector=coll_folders, app='ae', usr=TST_TMP_ROOT)
+        coll.collect("{app}", "{usr}")
+
+        assert not coll.error_message
+        assert len(coll.paths) == 2
         assert 'ae' in coll.paths
-        assert coll.files == [TST_TESTS_MODULE]
+        assert TST_TMP_ROOT in coll.paths
+        assert coll.files == []
         assert coll.selected == coll.paths + coll.files
         assert coll.failed == 0
-        assert not coll.error_message
 
     def test_collect_select_failures(self):
         coll = Collector(cw=os.getcwd(), app='ae', tst=TST_TMP_ROOT)
         coll.collect("{cw}", "{app}", 'ae', select=".*")
+
+        assert coll.error_message
         assert not coll.paths
         assert 2 <= len(coll.files) <= 5
         # ["{cw}/.gitignore", "{cw}/.commit_msg.txt", "{cw}/.python-version", "{cw}/.gitlab-ci.yml", "{cw}/.coverage"]
@@ -528,7 +575,6 @@ class TestCollector:
         assert coll.failed == 2
         assert coll.prefix_failed == {"{app}": 1, 'ae': 1}
         assert coll.suffix_failed == {".*": 2}
-        assert coll.error_message
 
     def test_collect_selects(self):
         coll = Collector(item_collector=coll_items, app='ae', tst=TST_TMP_ROOT)
@@ -930,6 +976,14 @@ class TestFilesRegister:
 
 
 class TestOtherHelpers:
+    def test_coll_item_type(self):
+        assert coll_item_type(TST_FOLDER_TESTS) is UNSET
+        assert coll_item_type(TST_TESTS_MODULE) == '.py'
+        assert coll_item_type("not existing file.txt") is None
+
+        with patch('ae.paths.os_path_isfile', return_value=True):
+            assert coll_item_type("mocked_existing_file_without_extension") == ""  # old version with splitext == "."
+
     def test_path_join(self):
         assert path_join("") == os_path_join("")
         assert path_join('part') == os_path_join('part')
@@ -1363,7 +1417,7 @@ class TestPathFolders:
 
 class TestPathItems:
     def test_file_callable(self):
-        def add_file(f_name, **kwargs):
+        def add_file(f_name: str, **kwargs: Any) -> str:
             """ callable used for the file_class argument of path_files. """
             added.append((f_name, kwargs))
             return f_name
