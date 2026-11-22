@@ -1,16 +1,16 @@
 <!-- THIS FILE IS EXCLUSIVELY MAINTAINED by the project ae.ae v0.3.110 -->
 <!-- THIS FILE IS EXCLUSIVELY MAINTAINED by the project aedev.namespace_root_tpls v0.3.33 -->
-# paths 0.3.49
+# paths 0.4.49
 
 [![GitLab develop](https://img.shields.io/gitlab/pipeline/ae-group/ae_paths/develop?logo=python)](
     https://gitlab.com/ae-group/ae_paths)
 [![LatestPyPIrelease](
-    https://img.shields.io/gitlab/pipeline/ae-group/ae_paths/release0.3.49?logo=python)](
-    https://gitlab.com/ae-group/ae_paths/-/tree/release0.3.49)
+    https://img.shields.io/gitlab/pipeline/ae-group/ae_paths/release0.4.49?logo=python)](
+    https://gitlab.com/ae-group/ae_paths/-/tree/release0.4.49)
 [![PyPIVersions](https://img.shields.io/pypi/v/ae_paths)](
     https://pypi.org/project/ae-paths/#history)
 
->ae namespace module portion paths: file system path helpers.
+>ae namespace module portion paths: file paths handling api.
 
 [![Coverage](https://ae-group.gitlab.io/ae_paths/coverage.svg)](
     https://ae-group.gitlab.io/ae_paths/coverage/index.html)
