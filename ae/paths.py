@@ -1,271 +1,9 @@
 """
-file system path helpers
-========================
+file paths handling api
+=======================
 
-this pure-Python namespace portion provides useful :ref:`path helper functions` as well as
-:ref:`generic system paths` for the platforms/OSes:
-
-    * Android
-    * iOS
-    * Linux
-    * macOS
-    * Windows
-
-the only external hard dependencies of this module are the ``ae`` namespace portions :mod:`ae.base` and :mod:`ae.files`.
-optional dependencies are:
-
-    * on Android the PyPi package ``jnius``, required by :func:`user_data_path` and :func:`user_docs_path`.
-    * the ``plyer`` PyPi package, required by :func:`add_common_storage_paths`.
-
-
-path helper functions
----------------------
-
-the generator functions :func:`coll_files`, :func:`coll_folders` and :func:`coll_items` are building the fundament
-for most of the file and folder collection functionality, provided by this module.
-
-the function :func:`path_files` is using these generators to determine the files within a folder structure that are
-matching the specified wildcards and :ref:`path part placeholders <generic system paths>`. similarly the
-function :func:`path_folders` for folders, and :func:`path_items` to collect both, file and folder names.
-
-use the functions :func:`copy_files` and :func:`move_files` to duplicate and move multiple files or entire
-file path trees. these two functions are based on :func:`copy_file` and :func:`move_file`.
-the functions :func:`copy_tree` and :func:`move_tree` provide an alternative way to copy or move
-entire directory trees.
-
-the helper function :func:`normalize` converts path strings containing path placeholders into regular path strings,
-resolving symbolic links, or is converting a path string from absolute paths to relative paths and vice versa.
-
-to determine if the path of a file or folder is matching a glob-like path pattern/mask with wildcards, the
-functions :func:`path_match` and :func:`paths_match` can be used. useful especially for cases where you don't
-have direct access to the file system.
-
-file paths for series of files, e.g., for logging, can be determined via the :func:`series_file_name` function.
-
-the function :func:`skip_py_cache_files` can be used in path file collections to skip the files situated in the
-Python cache folder ('__pycache__').
-
-
-default folder names
---------------------
-
-the following folder names are used as defaults and get provided via the :data:`PATH_PLACEHOLDERS` mapping:
-
-* :data:`I18N_FOLDER`: default name for a project's localization/translations folder ('loc').
-* :data:`IMAGE_FOLDER`: default name for a project's images folder ('img').
-* :data:`SOUND_FOLDER`: default name for a project's audio/sound folder ('snd').
-
-all these default names can be individually adapted for your web/app project via the :mod:`ae.config` module.
-
-
-generic system paths
---------------------
-
-generic system paths are determined by the following helper functions:
-
-* :func:`app_data_path`: the application data path.
-* :func:`app_docs_path`: the application documents path.
-* :func:`user_data_path`: the user data path.
-* :func:`user_docs_path`: the user documents path.
-
-these system paths together with additional generic paths like e.g., the current working directory, storage paths
-provided by the `plyer` package, or user and application paths, are provided as `path placeholders`, which get
-stored within the :data:`PATH_PLACEHOLDERS` dict by calling the function :func:`add_common_storage_paths`.
-
-:func:`path_name` and :func:`placeholder_path` are converting regular path strings or parts of it into path
-placeholders.
-
-
-file/folder collection and classification
------------------------------------------
-
-more complex collections of files and folder paths, and the grouping of them, can be done
-with the classes :class:`Collector`, described in the underneath section :ref:`collecting files`,
-and :class:`FilesRegister`, described in the section :ref:`files register`.
-
-use the :ref:`Collector class <collecting files>` for temporary quick file path searches on your
-local file systems as well as on remote servers/hosts. one implementation example is e.g., the method
-:meth:`~ae.pythonanywhere.PythonanywhereApi.deployed_code_files` of the :mod:`ae.pythonanywhere` module.
-
-the class :ref:`FilesRegister <files register>` helps you to create and cache file path
-registers permanently, to quickly find at any time the best fitting match for a requested purpose.
-for example, the :mod:`~ae.gui` portion is using it to dynamically select resource files depending
-on the current user preferences, hardware and/or software environment.
-
-
-collecting files
-^^^^^^^^^^^^^^^^
-
-to collect file names in the current working directory, create an instance of the :class:`Collector` class and call
-its :meth:`~Collector.collect` method with a file or folder path, which can contain wildcards::
-
-    from ae.paths import Collector
-    coll = Collector()
-    coll.collect('*.png')
-    image_files_list = coll.files
-
-after that a list containing the found file names can then be retrieved from the :attr:`~Collector.files` attribute.
-
-:meth:`~Collector.collect` can be called multiple times to accumulate and extend the :attr:`~Collector.files` list::
-
-    coll = Collector()
-    coll.collect('*.png')
-    coll.collect('*.jpg')
-    image_files_list = coll.files
-
-multiple calls of :meth:`Collector.collect` can be joined into one code line, because it is returning its instance.
-the following statement is equivalent to the last example::
-
-    image_files_list = Collector().collect('*.png').collect('*.jpg').files
-
-by specifying the ``**`` wildcard entire folder trees can be scanned. the following example is a collection of all
-the files, including the hidden ones, in the folder tree under the current working directory::
-
-    test_files = Collector().collect('**/*').collect('**/.*').files
-
-.. hint::
-    the second call of the :meth:`Collector.collect` method in this example has to be done only if you are
-    using Python's :func:`glob.glob` as the searcher callback, which excludes hidden files (with a leading dot)
-    from to match the ``*`` wildcard.
-
-:class:`Collector` is by default only returning files. to also collect folder paths in a deep folder tree, you have
-to pass the collecting generator function to the optional :paramref:`~Collector.item_collector` parameter of the
-:class:`Collector` class. the accumulated files and folders can then be retrieved from their respective instance
-attributes :attr:`~Collector.files`, :attr:`~Collector.paths` and :attr:`~Collector.selected`::
-
-    coll = Collector(item_collector=coll_items)
-    coll.collect("*.png")
-    image_files_list = coll.files
-    folders = coll.paths
-    file_and_folder_items = coll.selected
-
-the found files are provided by the :attr:`Collector.files` instance attribute. found folders will be separately
-collected within the :class:`Collector` instance attribute :attr:`~Collector.paths`. the :attr:`~Collector.selected`
-attribute contains all found files and folders in a single list.
-
-
-collect from multiple locations
-_______________________________
-
-in a single call of :meth:`~Collector.collect`, providing the method parameters :paramref:`~Collector.collect.append`
-or :paramref:`~Collector.collect.select`, you can scan multiple combinations of path prefixes and suffixes, which can
-both contain wildcards and folder names, whereas the suffixes contain also parts of the file names to search for.
-
-.. hint:: the wildcards `*`, `**` and `?` are allowed in the prefixes as well as in suffixes.
-
-the resulting file paths are relative or absolute, depending on whether the specified prefix(es) contains
-absolute or relative paths.
-
-in the following example determines the relative paths of all folders directly underneath the current working directory
-with a name that contains the string `'xxx'` or is starting with `'yyy'` or is ending with `'zzz'`::
-
-    coll = Collector(item_collector=coll_folders)
-    coll.collect('', append=('*xxx*', 'yyy*', '*zzz'))
-    folders = coll.paths
-
-.. hint:: replace empty string in the first argument of :meth:`~Collector.collect` with '{cwd}' to get absolute paths.
-
-the following example is first collecting the absolute paths of files with the name `xxx.cfg` from all the found
-locations/folders. then it is starting to search in the current working directory ({cwd}), in the folder above the
-application data folder ({app}), and finally in a folder with the name of the main application underneath the
-user data folder ({usr})::
-
-    coll = Collector()
-    coll.collect("{cwd}", "{app}/..", "{usr}/{main_app_name}", append="xxx.cfg")
-    found_files = coll.files
-
-to overwrite some of the generic path placeholder parts values only for a specific :class:`Collector` instance, e.g.,
-the main application name (`{main_app_name}`) and the application data path (`{app}`), you simply specify the changed
-values as kwargs in the construction of the :class:`Collector` instance::
-
-    coll = Collector(main_app_name="myApp", app="path/to/app/data")
-
-additionally, you can specify any other path placeholders that will be automatically used and replaced in the arguments
-of the :meth:`~Collector.collect` method for a so prepared :class:`Collector` instance::
-
-    coll = Collector(any_other_placeholder="folder_name_or_path")
-
-by using the :paramref:`~Collector.collect.select` argument, the found files and folders will additionally be collected
-in the :class:`Collector` instance attribute :attr:`~Collector.selected`.
-
-not existing combinations collected via the :paramref:`~Collector.collect.select` argument will be logged.
-the results are provided by the instance attributes :attr:`~Collector.failed`, :attr:`~Collector.prefix_failed` and
-:attr:`~Collector.suffix_failed`.
-
-
-files register
-^^^^^^^^^^^^^^
-
-a files register is an instance of the :class:`FilesRegister`, providing a property-based file collection and selection,
-which is e.g., used by the :mod:`ae.gui` ae namespace portion to find and select resource files like icon/image or
-sound files.
-
-files can be collected from various places by a single instance of the class :class:`FilesRegister`::
-
-    from ae.paths import FilesRegister
-
-    file_reg = FilesRegister()
-    file_reg.add_paths("first/path/to/collect/files/from")
-    file_reg.add_paths("second/path/to/collect/files/from")
-
-in this example the :class:`FilesRegister` instance collects all files that are existing in any subfolders underneath
-the two provided paths. alternatively specify the file pathes to collect from directly as instantiation arguments::
-
-    file_reg = FilesRegister("first/path/to/collect", "second/path/to/collect")
-
-after the collection use the FilesRegister instance (`file_reg`) to find any of the collected files::
-
-    registered_file = file_reg.find_file('file_name')
-
-the :meth:`~FilesRegister.find_file` method will return a :class:`~ae.files.RegisteredFile`
-instance if a file with the stem (base name w/o extension) `'file_name'` got collected.
-
-multiple files with the same stem can be collected and registered e.g., with different formats, to be selected by
-properties, which are specified in the folder names of the collected file paths.
-
-for example, the following folder tree contains icon images in two sizes::
-
-    resources/
-        size_72/
-            app_icon.jpg
-        size_150/
-            app_icon.png
-
-when you then create an instance of :class:`FilesRegister` both image files underneath the `resources` folder will get
-registered, interpreting the subfolder names (`size_*`) as properties or attributes for the registered files,
-where `size` will result as the property name and the string after the underscore as the property value::
-
-    file_reg = FilesRegister("resources")
-
-now, to retrieve the paths of the application image file with the size ``72``, call the
-:meth:`~FilesRegister.find_file` method, specifying the property name(s) and value(s) as the second argument::
-
-    app_icon_image_path = file_reg.find_file('app_icon', dict(size=72))
-
-the file path in `app_icon_image_path` will then result as `"resources/size_72/app_icon.jpg"`.
-
-alternatively, and as a shortcut, you can call the instance object directly (leaving the explicit `.find_file`
-method away), like this::
-
-    app_icon_image_path = file_reg('app_icon', dict(size=150))
-
-the resulting file path in `app_icon_image_path` of the last example will now result as
-"resources/size_150/app_icon.png"`, because this time the size property value got specified as `150`.
-
-additionally, an instance of :class:`FilesRegister` (`file_reg`) behaves like a dict object, where the item key is the
-file stem ('app_icon') and the item value is a list of instances of :class:`~ae.files.RegisteredFile`. both files
-in the resources folder are provided as one dict item::
-
-    file_reg = FilesRegister("resources")
-    assert 'app_icon' in file_reg
-    assert len(file_reg) == 1
-    assert len(file_reg['app_icon']) == 2
-    assert isinstance(file_reg['app_icon'][0], RegisteredFile)
-
-for more complex selections you can use callables passed into the :paramref:`~FilesRegister.find_file.property_matcher`
-and :paramref:`~FilesRegister.find_file.file_sorter` arguments of :meth:`~FilesRegister.find_file`.
+see section :ref:`file paths handling` for more info and examples.
 """
-# pylint: disable=too-many-lines
 from __future__ import annotations  # allow type forward references (PEP 563), can be removed in Python 3.14+ (PEP 749)
 
 import glob
@@ -291,7 +29,7 @@ from ae.files import CachedFile, FileObject, PropertiesType, RegisteredFile     
 from ae.system import app_name_guess, os_platform                                           # type: ignore
 
 
-__version__ = '0.3.49'
+__version__ = '0.4.49'
 
 
 COLLECTED_FOLDER = UNSET                                            #: item type value for a folder|directory|node
@@ -331,28 +69,7 @@ type SearcherType = Callable[[str], SearcherRetType]
 
 
 def add_common_storage_paths():
-    """ add common storage paths to :data:`PATH_PLACEHOLDERS` depending on the operating system (OS).
-
-    the following storage paths are provided by the `plyer` PyPi package (not all of them are available in each OS):
-
-    * `{application}`: user application directory.
-    * `{documents}`: user documents directory.
-    * `{downloads}`: user downloads directory.
-    * `{external_storage}`: external storage root directory.
-    * `{home}`: user home directory.
-    * `{music}`: user music directory.
-    * `{pictures}`: user pictures directory.
-    * `{root}`: root directory of the operating system partition.
-    * `{sdcard}`: SD card root directory (only available in Android if sdcard is inserted).
-    * `{videos}`: user videos directory.
-
-    additionally, storage paths that are only available on certain OS (inspired by the method `get_drives`, implemented
-    in `<https://github.com/kivy-garden/filebrowser/blob/master/kivy_garden/filebrowser/__init__.py>`_):
-
-    * `Linux`: external storage devices/media mounted underneath the system partition root in /mnt or /media.
-    * `Apple Mac OS X or iOS`: external storage devices/media mounted underneath the system partition root in /Volume.
-    * `MS Windows`: additional drives mapped as the drive partition name.
-    """
+    """ add common storage paths to :data:`PATH_PLACEHOLDERS` depending on the operating system (OS). """
     def _add_generic_storage_paths():
         try:
             storagepath = importlib.import_module('plyer').storagepath          # from plyer import storagepath
@@ -408,8 +125,6 @@ def add_common_storage_paths():
 def app_data_path() -> str:
     """ determine the os-specific absolute path of the {app} directory where user app data can be stored.
 
-    .. hint:: use :func:`app_docs_path` instead to get a more public path to the user.
-
     :return:                    path string of the user app data folder.
     """
     return os_path_join(user_data_path(), PATH_PLACEHOLDERS.get('main_app_name', PATH_PLACEHOLDERS['app_name']))
@@ -417,8 +132,6 @@ def app_data_path() -> str:
 
 def app_docs_path() -> str:
     """ determine the os-specific absolute path of the {ado} directory where user documents app are stored.
-
-    .. hint:: use :func:`app_data_path` instead to get a more hidden path to the user.
 
     :return:                    path string of the user documents app folder.
     """
@@ -495,7 +208,7 @@ def coll_items(item_mask: str,
                                 instance/return-value will be appended as an item to the returned item list.
                                 if not passed, then the `str` class will be used, which means that the items
                                 of the returned list will be strings of the file/folder path and name.
-                                passing a class, like e.g., :class:`ae.files.CachedFile`, :class:`ae.files.CachedFile`
+                                passing a class, like e.g. :class:`ae.files.CachedFile`, :class:`ae.files.CachedFile`
                                 or :class:`pathlib.Path`, will create instances of this class.
                                 alternatively, you can pass a callable which will be called on each found file/folder.
                                 in this case the return value of the callable will be inserted in the related
@@ -642,7 +355,7 @@ def path_items(item_mask: str, selector: Callable[[CollArgType], bool | Any] = s
                                 instance/return-value will be appended as an item to the returned item list.
                                 if not passed, then the `str` class will be used, which means that the items
                                 of the returned list will be strings of the file/folder path and name.
-                                passing a class, like e.g., :class:`ae.files.CachedFile`, :class:`ae.files.CachedFile`
+                                passing a class, like e.g. :class:`ae.files.CachedFile`, :class:`ae.files.CachedFile`
                                 or :class:`pathlib.Path`, will create instances of this class.
                                 alternatively, you can pass a callable which will be called on each found file/folder.
                                 in this case the return value of the callable will be inserted in the related
@@ -659,22 +372,6 @@ def path_join(*parts: str) -> str:
 
     :param parts:               path parts to join.
     :return:                    joined path string.
-
-    .. hint::
-        although :func:`os.path.join` is implemented in C, this function is faster::
-
-            import os
-            import timeit
-            from ae.paths import path_join
-            paths_secs = timeit.timeit('path_join("test", "sub_test", "sub_sub_test")', globals=globals())
-            os_secs = timeit.timeit('os.path.join("test", "sub_test", "sub_sub_test")', globals=globals())
-            assert paths_secs < os_secs
-
-        even if you import :func:`os.path.join` without the namespace prefixes, like this::
-
-            from os.path import join as path_join
-            os_secs = timeit.timeit('path_join("test", "sub_test", "sub_sub_test")', globals=globals())
-            assert paths_secs < os_secs
     """
     assert parts, "missing required positional argument(s) with path parts to join"
 
@@ -719,7 +416,7 @@ def path_match(path: str, mask: str) -> bool:
                                 the :paramref:`.mask` argument.
     """
     if sys.version_info < (3, 13):
-        re_mask = _path_match_replacement.sub(lambda _match: _path_match_tokens_to_re[_match.group(0)], re.escape(mask))
+        re_mask = _path_match_replacement.sub(lambda _match: _path_match_tokens_to_re[_match.group()], re.escape(mask))
         match = bool(re.fullmatch(re_mask, path))
     else:
         # noinspection PyUnusedLocal
@@ -813,7 +510,7 @@ def resources_folder_names(resource_types: Iterable[str] = RESOURCES_NAMES,
     :param path_placeholders:   path placeholders dict (used by pjm to pass project-specific placeholders).
     :return:                    list of the app/user-specific folder names (defined in :paramref:`.path_placeholders`),
                                 followed by all the default resource subfolder names, of the (in
-                                :paramref:`.resource_types) specified resource types.
+                                :paramref:`.resource_types`) specified resource types.
     """
     if path_placeholders is None:
         path_placeholders = PATH_PLACEHOLDERS
@@ -863,11 +560,7 @@ def skip_py_cache_files(file_path: str) -> bool:
 
 
 def user_data_path() -> str:
-    """ determine the os-specific absolute path of the {usr} directory where user data can be stored.
-
-    .. hint::
-        this path is not accessible on Android devices, use :func:`user_docs_path` instead to get a more public
-        path to the user.
+    """ determine the os-specific absolute path of the {usr} directory where the app user data can be stored.
 
     :return:    path string of the user data folder.
     """
@@ -899,8 +592,6 @@ def user_data_path() -> str:
 
 def user_docs_path() -> str:
     """ determine the os-specific absolute path of the {doc} directory where the user is storing the personal documents.
-
-    .. hint:: use :func:`user_data_path` instead to get the more hidden user data.
 
     :return:                    path string of the user documents folder.
     """
@@ -991,25 +682,16 @@ class Collector:                                                    # pylint: di
                 select: str | tuple[str, ...] = ()) -> Collector:
         """ collect additional files/folders by combining the given prefixes with all the given append/select suffixes.
 
-        .. note:: all arguments of this method can either be passed either as tuples or for a single value as string.
-
-        :param prefixes:        tuple of file/folder paths to be used as prefixes.
-        :param append:          tuple of file/folder names to be used as suffixes.
-        :param select:          tuple of file/folder names to be used as suffixes. this argument is, in contrary to
-                                :paramref:`.append`, also logging any not found :paramref:`.prefixes`
-                                combinations in the instance attributes :attr:`.failed`, :attr:`prefix_failed` and
-                                :attr:`suffix_failed`.
-
-        each of the passed :paramref:`.prefixes` will be combined with the suffixes specified in :paramref:`.append` and
-        in :paramref:`.select`. all the matching file/folder paths will be added to the appropriate instance attribute,
-        either :attr:`~Collector.files` for a file or :attr:`~Collector.paths` for a folder.
-
-        additionally, the existing file/folder paths from the combinations of :paramref:`.prefixes` and
-        :paramref:`.select` will be added in the :attr:`~Collector.selected` list attribute.
-
-        .. hint:: more details and some examples are available in the doc string of this :mod:`module <ae.paths>`.
+        :param prefixes:        at least one or multiple file/folder paths, with wildcards, to be used as prefixes.
+        :param append:          tuple of file/folder names to be used as suffixes or a single suffix as string argument.
+        :param select:          tuple of file/folder names to be used as suffixes or a single suffix as string argument.
+                                in contrary to :paramref:`.append`, matches of this argument are getting counted if
+                                they not get found in combination with any of the :paramref:`.prefixes`. the counters
+                                are provided in the instance attributes :attr:`.failed`, :attr:`.prefix_failed` and
+                                :attr:`.suffix_failed`.
+        :raises:                `AssertionError` if no prefixes are specified.
         """
-
+        assert prefixes, "ae.paths.Collector.collect(): at least one prefix has to be specified"
         if isinstance(append, str):
             append = (append, )
         if isinstance(select, str):
@@ -1094,9 +776,9 @@ class FilesRegister(dict):
                                 values greater than n (==len(file_list)) will append the file_obj to the end of the file
                                 object list. the order of the added items will be unchanged if this value is greater or
                                 equal to zero. negative values will add the items from :paramref:`.files` in
-                                reversed order, and **after** the item specified by this index value (so passing -1 will
-                                append the items to the end in reversed order, while passing -(n+1) will insert them at
-                                the beginning in reversed order).
+                                reversed order, and **after** the item specified by this index value. so passing -1 will
+                                append the items to the end in reversed order and passing -(n+1) will insert them at
+                                the beginning in reversed order.
         :return:                list of paths of the added files.
         """
         increment = -1 if first_index < 0 else 1

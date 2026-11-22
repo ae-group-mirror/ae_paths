@@ -510,17 +510,10 @@ class TestCollector:
             if os_path_isdir("sub_dir"):
                 shutil.rmtree("sub_dir")
 
-    def test_collect_no_args(self):
+    def test_collect_no_args_exception(self):
         coll = Collector()
-        coll.collect()
-
-        assert not coll.error_message
-        assert not coll.paths
-        assert not coll.files
-        assert not coll.selected
-        assert coll.failed == 0
-        assert len(coll.prefix_failed) == 0
-        assert len(coll.suffix_failed) == 0
+        with pytest.raises(AssertionError):
+            coll.collect()
 
     def test_collect_nothing_findable(self):
         coll = Collector(app="tst_app_path")
